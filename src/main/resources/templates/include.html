@@ -1,0 +1,45 @@
+<!-- 通用CSS -->
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="header (title)">
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <meta content="IE=edge" http-equiv="X-UA-Compatible">
+    <meta content="" name="keywords">
+    <meta content="" name="description">
+    <title th:text="${title}"></title>
+    <!-- 有 system.favicon 时用配置；未注入配置的页面仍用静态资源路径。 -->
+    <link rel="shortcut icon" th:if="${systemFavicon != null and !#strings.isEmpty(systemFavicon)}"
+          th:href="@{${systemFavicon}}" type="image/x-icon">
+    <link rel="shortcut icon" th:unless="${systemFavicon != null and !#strings.isEmpty(systemFavicon)}"
+          th:href="@{/static/ico/favicon.ico}" type="image/x-icon">
+    <link rel="stylesheet" th:href="@{/static/component/pear/css/pear.css}">
+</head>
+
+<!-- 部门下拉树：Layui dropdown + tree，hidden 字段名与 placeholder 可传参 -->
+<th:block th:fragment="deptDropdownSelect(name, placeholder)">
+    <input name="deptId" th:name="${name}" type="hidden">
+    <div class="layui-unselect layui-form-select layui-dept-dropdown">
+        <div class="layui-select-title">
+            <input class="layui-dept-dropdown-input layui-input layui-unselect" readonly th:placeholder="${placeholder}"
+                   type="text">
+            <i class="layui-edge"></i>
+        </div>
+    </div>
+</th:block>
+
+<!-- 通用JS -->
+<div th:fragment="footer">
+    <script>
+        window.apiPath = "[[${rootPath}]]";
+        const apiPath = window.apiPath;
+    </script>
+    <script th:src="@{/static/component/layui/layui.js}"></script>
+    <script th:src="@{/static/component/pear/pear.js}"></script>
+    <script th:src="@{/static/admin/js/dict-util.js}"></script>
+    <script th:src="@{/static/admin/js/dept-util.js}"></script>
+    <script>
+        layui.use(['common'], function () {
+            layui.common.initPage();
+        });
+    </script>
+</div>

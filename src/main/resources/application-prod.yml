@@ -1,0 +1,71 @@
+# 生产环境：启动时加 --spring.profiles.active=prod
+server:
+  port: 8081
+
+spring:
+  threads:
+    virtual:
+      # 生产环境压测确认 Sa-Token、日志上下文、数据库连接池表现后再开启。
+      enabled: false
+  datasource:
+    # 应用和历史 datetime 数据按中国本地时间处理；serverTimezone 与 app.timezone 对齐。
+    url: jdbc:mysql://127.0.0.1:3306/admin_layui?useSSL=false&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=utf-8&serverTimezone=${app.timezone}
+    username: admin_layui
+    password: xxxxxxx
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: HikariCP
+      minimum-idle: 5
+      maximum-pool-size: 15
+      idle-timeout: 30000
+      connection-test-query: SELECT 1
+      # Hikari 仅支持单条 init SQL；utf8mb4 仍由 JDBC URL characterEncoding 保证。
+      # 用偏移量而非 IANA 名：MySQL 未导入时区表时 SET time_zone='Asia/Shanghai' 会失败。
+      # Java/Jackson/JDBC 仍读 app.timezone；此处钉死会话 NOW() 为东八区。
+      connection-init-sql: SET time_zone = '+08:00'
+      connection-timeout: 5000
+      max-lifetime: 1800000
+      auto-commit: true
+  data:
+    redis:
+      # Sa-Token 整合 Redis（生产环境建议 Redis 必须可用）。
+      host: 127.0.0.1
+      port: 6379
+      database: 0
+      # Redis 无密码可留空；有密码请填写。
+      password:
+      connect-timeout: 3s
+      timeout: 3s
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: 3s
+  devtools:
+    restart:
+      enabled: false
+  thymeleaf:
+    cache: true
+
+mybatis-plus:
+  configuration:
+    # 生产禁止 StdOutImpl；SQL 仅通过 logging.level 临时开启，默认不输出
+    # log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# 生产日志：比 dev 更克制；排查 SQL 时临时将 com.ylmao.admin.mapper 改为 debug
+logging:
+  level:
+    root: warn
+    com.ylmao.admin: info
+    org.springframework.web: warn
+    org.springframework.web.servlet.PageNotFound: error
+    org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver: error
+    com.ylmao.admin.mapper: info
+
+# 生产关闭在线接口文档，避免文档入口裸奔。
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

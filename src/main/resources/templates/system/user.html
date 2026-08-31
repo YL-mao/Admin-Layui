@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sa="https://www.thymeleaf.org/extras/sa-token">
+<head th:replace="~{include :: header('用户管理')}"></head>
+<body class="pear-container">
+<style>
+    /* 安全配置标签较长，抽屉内加宽避免换行；底部栏仍用常规 mainBox/bottom。 */
+    .security-config-drawer .layui-form-label {
+        width: 130px;
+        white-space: nowrap;
+    }
+    .security-config-drawer .layui-input-block {
+        margin-left: 160px;
+    }
+</style>
+<div class="layui-card">
+    <div class="layui-card-body">
+        <form class="layui-form" action="">
+            <div class="layui-form-item">
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">登录账号</label>
+                    <div class="layui-input-inline">
+                        <input type="text" name="userAccount" maxlength="64" placeholder="请输入登录账号" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">启用状态</label>
+                    <div class="layui-input-inline">
+                        <select name="isEnabled">
+                            <option value="">全部</option>
+                            <option value="1">启用</option>
+                            <option value="0">停用</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">锁定状态</label>
+                    <div class="layui-input-inline">
+                        <select name="isLock">
+                            <option value="">全部</option>
+                            <option value="1">锁定</option>
+                            <option value="0">正常</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <button class="pear-btn pear-btn-md pear-btn-primary" lay-submit lay-filter="user-query">
+                        <i class="layui-icon layui-icon-search"></i>
+                        查询
+                    </button>
+                    <button type="reset" class="pear-btn pear-btn-md">
+                        <i class="layui-icon layui-icon-refresh"></i>
+                        重置
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="layui-card">
+    <div class="layui-card-body">
+        <table id="user-table" lay-filter="user-table"></table>
+    </div>
+</div>
+
+<script type="text/html" id="user-toolbar">
+    <button sa:hasPermission="system:user:insert" class="pear-btn pear-btn-primary pear-btn-md" lay-event="add">
+        <i class="layui-icon layui-icon-add-1"></i>
+        新增
+    </button>
+    <button sa:hasPermission="system:user:delete" class="pear-btn pear-btn-danger pear-btn-md" lay-event="batchRemove">
+        <i class="layui-icon layui-icon-delete"></i>
+        删除
+    </button>
+    <button sa:hasPermission="system:config:security" class="pear-btn pear-btn-md" lay-event="securityConfig">
+        <i class="layui-icon layui-icon-set"></i>
+        安全配置
+    </button>
+</script>
+
+<script type="text/html" id="user-bar">
+    <button sa:hasPermission="system:user:update" class="pear-btn pear-btn-primary pear-btn-sm" lay-event="edit"><i class="layui-icon layui-icon-edit"></i>
+    </button>
+    <button sa:hasPermission="system:user:permDetail" class="pear-btn pear-btn-warming pear-btn-sm" lay-event="permDetail"><i class="layui-icon layui-icon-auz"></i>
+    </button>
+    <button sa:hasPermission="system:user:updatePwd" class="pear-btn pear-btn-warming pear-btn-sm" lay-event="password"><i class="layui-icon layui-icon-password"></i>
+    </button>
+    <button sa:hasPermission="system:user:delete" class="pear-btn pear-btn-danger pear-btn-sm" lay-event="remove"><i class="layui-icon layui-icon-delete"></i>
+    </button>
+</script>
+
+<script type="text/html" id="user-perm-panel">
+    <div class="mainBox">
+        <div class="main-container">
+            <div class="layui-form-item">
+                <label class="layui-form-label">角色</label>
+                <div class="layui-input-block" id="user-perm-roles" style="padding-top: 9px;"></div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">权限</label>
+                <div class="layui-input-block">
+                    <div class="layui-btn-container" style="margin-bottom: 12px;">
+                        <button type="button" class="pear-btn pear-btn-sm" id="user-perm-expand">
+                            <i class="layui-icon layui-icon-spread-left"></i>
+                            展开
+                        </button>
+                        <button type="button" class="pear-btn pear-btn-sm" id="user-perm-collapse">
+                            <i class="layui-icon layui-icon-shrink-right"></i>
+                            折叠
+                        </button>
+                    </div>
+                    <div id="user-perm-tree"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</script>
+
+
+
+<script type="text/html" id="user-sex" th:inline="none">
+    {{ d.userSexName || '' }}
+</script>
+
+<script type="text/html" id="user-online" th:inline="none">
+{{# if(d.userId === window.currentUserId){ }}
+    <input type="checkbox" name="online" value="{{d.userId}}" data-user-name="{{d.userName || ''}}" lay-skin="switch"
+           lay-text="在线|离线" lay-filter="user-online" {{# if(d.online == 1){ }}checked{{# } }} disabled />
+{{# } else if(d.online == 1){ }}
+    <input type="checkbox" name="online" value="{{d.userId}}" data-user-name="{{d.userName || ''}}" lay-skin="switch"
+           lay-text="在线|离线" lay-filter="user-online" checked />
+{{# } else { }}
+    <input type="checkbox" name="online" value="{{d.userId}}" data-user-name="{{d.userName || ''}}" lay-skin="switch"
+           lay-text="在线|离线" lay-filter="user-online" />
+{{# } }}
+</script>
+<script type="text/html" id="user-enable" th:inline="none">
+{{# if(d.userId === window.currentUserId){ }}
+    <input type="checkbox" name="isEnabled" value="{{d.userId}}" lay-skin="switch" lay-text="启用|停用" lay-filter="user-enable"
+           {{# if(d.isEnabled == 1){ }}checked{{# } }} disabled />
+{{# } else if(d.isEnabled == 1){ }}
+    <input sa:hasPermission="system:user:updateEnabled" type="checkbox" name="isEnabled" value="{{d.userId}}" lay-skin="switch" lay-text="启用|停用" lay-filter="user-enable" checked />
+{{# } else { }}
+    <input sa:hasPermission="system:user:updateEnabled" type="checkbox" name="isEnabled" value="{{d.userId}}" lay-skin="switch" lay-text="启用|停用" lay-filter="user-enable" />
+{{# } }}
+</script>
+<script type="text/html" id="user-lock" th:inline="none">
+{{# if(d.userId === window.currentUserId){ }}
+    <input type="checkbox" name="isLock" value="{{d.userId}}" lay-skin="switch" lay-text="锁定|正常" lay-filter="user-lock"
+           {{# if(d.isLock == 1){ }}checked{{# } }} disabled />
+{{# } else if(d.isLock == 1){ }}
+    <input sa:hasPermission="system:user:unlock" type="checkbox" name="isLock" value="{{d.userId}}" lay-skin="switch" lay-text="锁定|正常" lay-filter="user-lock" checked />
+{{# } else { }}
+    <input sa:hasPermission="system:user:unlock" type="checkbox" name="isLock" value="{{d.userId}}" lay-skin="switch" lay-text="锁定|正常" lay-filter="user-lock" />
+{{# } }}
+</script>
+<script type="text/html" id="user-add">
+    <form class="layui-form" lay-filter="user-add" action="">
+        <div class="mainBox">
+            <div class="main-container">
+                <input type="hidden" name="userId">
+                <div class="layui-form-item">
+                    <label class="layui-form-label">账号</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="userAccount" lay-verify="required" maxlength="64" autocomplete="off" placeholder="请输入登录账号"
+                               class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">姓名</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="userName" lay-verify="required" maxlength="64" autocomplete="off" placeholder="请输入姓名"
+                               class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">邮箱</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="userEmail" maxlength="64" autocomplete="off" placeholder="请输入邮箱"
+                               class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">电话</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="userPhone" maxlength="20" autocomplete="off" placeholder="请输入电话"
+                               class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">性别</label>
+                    <div class="layui-input-block user-sex-radio"></div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">角色</label>
+                    <div class="layui-input-block">
+                        <select name="roleIds" xm-select="userRoleSelect">
+                            <option th:each="r : ${roleList}" th:value="${r.roleId}" th:text="${r.roleName}"></option>
+                        </select>
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">岗位</label>
+                    <div class="layui-input-block">
+                        <select name="postId" lay-search="">
+                            <option value="">请选择岗位</option>
+                            <option th:each="p : ${postList}" th:value="${p.postId}" th:text="${p.postName}"></option>
+                        </select>
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">部门</label>
+                    <div class="layui-input-block" th:insert="~{include :: deptDropdownSelect('deptId', '请选择部门')}"></div>
+                </div>
+            </div>
+        </div>
+        <div class="bottom">
+            <div class="button-container">
+                <button sa:hasPermissionOr="system:user:insert,system:user:update" type="submit" class="pear-btn pear-btn-primary pear-btn-sm" lay-submit=""
+                        lay-filter="user-save">
+                    <i class="layui-icon layui-icon-ok"></i>
+                    提交
+                </button>
+                <button type="button" class="pear-btn pear-btn-sm" onclick="closeCurrentLayer()">
+                    <i class="layui-icon layui-icon-close"></i>
+                    关闭
+                </button>
+            </div>
+        </div>
+    </form>
+
+</script>
+<script type="text/html" id="user-password">
+    <form class="layui-form" lay-filter="user-password" action="">
+        <div class="mainBox">
+            <div class="main-container">
+                <input type="hidden" name="userId">
+                <div class="layui-form-item">
+                    <label class="layui-form-label">输入密码</label>
+                    <div class="layui-input-block">
+                        <input type="password" name="userPassword" lay-verify="required" autocomplete="off"
+                               placeholder="8位以上，含字母、数字、特殊字符" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">确认密码</label>
+                    <div class="layui-input-block">
+                        <input type="password" name="confirmPassword" lay-verify="required" autocomplete="off"
+                               placeholder="请再次输入密码" class="layui-input">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="bottom">
+            <div class="button-container">
+                <button sa:hasPermission="system:user:updatePwd" type="submit" class="pear-btn pear-btn-primary pear-btn-sm" lay-submit=""
+                        lay-filter="user-password-save">
+                    <i class="layui-icon layui-icon-ok"></i>
+                    提交
+                </button>
+                <button type="button" class="pear-btn pear-btn-sm" onclick="closeCurrentLayer()">
+                    <i class="layui-icon layui-icon-close"></i>
+                    关闭
+                </button>
+            </div>
+        </div>
+    </form>
+</script>
+<script th:inline="javascript">
+    window.deptTreeData = /*[[${deptList}]]*/ [];
+    window.currentUserId = /*[[${currentUserId}]]*/ '';
+</script>
+<th:block th:insert="~{include :: footer}"/>
+<script>
+    /* global layui, apiPath, deptTreeData, loadDict, renderDictRadio, DictTypeCode */
+    layui.use(['common', 'table', 'form', 'jquery', 'select', 'tree', 'layer'], function () {
+        let table = layui.table;
+        let form = layui.form;
+        let $ = layui.jquery;
+        let formSelects = layui.select;
+        let tree = layui.tree;
+        let layer = layui.layer;
+        var MODULE_PATH = apiPath + "/user";
+        var CONFIG_PATH = apiPath + "/config";
+
+        // 预加载性别字典；打开表单时再次 .done 确保选项就绪。
+        loadDict(DictTypeCode.SYS_USER_SEX);
+        form.render('select');
+
+        function initUserSexRadio(layero, selectedValue) {
+            renderDictRadio(layero.find('.user-sex-radio'), 'userSex', getDictOptions(DictTypeCode.SYS_USER_SEX), {
+                selectedValue: selectedValue
+            });
+            form.render('radio');
+        }
+
+        function initUserRoleSelect(layero, roleIds) {
+            let $sel = layero.find('select[xm-select="userRoleSelect"]');
+            if ($sel.length === 0) {
+                return;
+            }
+            formSelects.render('userRoleSelect');
+            if (roleIds) {
+                formSelects.value('userRoleSelect', roleIds.split(','));
+            }
+        }
+
+        let cols = [
+            [
+                {type: 'checkbox'},
+                {title: '姓名', field: 'userName', align: 'center'},
+                {title: '登录账号', field: 'userAccount', align: 'center'},
+                {title: '性别', field: 'userSexName', align: 'center', width: 80},
+                {title: '邮箱', field: 'userEmail', align: 'center'},
+                {title: '电话', field: 'userPhone', align: 'center'},
+                {title: '部门', field: 'deptName', align: 'center'},
+                {title: '岗位', field: 'postName', align: 'center'},
+                {title: '角色', field: 'roleNames', align: 'center'},
+                {title: '在线', field: 'online', align: 'center', templet: '#user-online', width: 120},
+                {title: '状态', field: 'isEnabled', align: 'center', templet: '#user-enable', width: 120},
+                {title: '锁定', field: 'isLock', align: 'center', templet: '#user-lock', width: 120},
+                {title: '操作', toolbar: '#user-bar', align: 'center', width: 210}
+            ]
+        ]
+
+        // 从后台分页加载用户列表。
+        table.render({
+            response: TABLE_RESPONSE,
+            elem: '#user-table',
+            url: MODULE_PATH + '/list',
+            page: true,
+            cols: cols,
+            skin: 'line',
+            toolbar: '#user-toolbar',
+            defaultToolbar: [{
+                title: '刷新',
+                layEvent: 'refresh',
+                icon: 'layui-icon-refresh',
+            }, 'filter', 'print', {
+                name: 'exports',
+                onClick: function () {
+                    // 按当前筛选条件请求后台导出 Excel（与查询表单字段一致）。
+                    let formData = $('form.layui-form').first().serialize();
+                    window.location.href = MODULE_PATH + '/export' + (formData ? '?' + formData : '');
+                }
+            }],
+            done: function () {
+                form.render('checkbox');
+            }
+        });
+
+        table.on('tool(user-table)', function (obj) {
+            if (obj.event === 'remove') {
+                window.remove(obj);
+            } else if (obj.event === 'edit') {
+                window.edit(obj);
+            } else if (obj.event === 'password') {
+                window.password(obj);
+            } else if (obj.event === 'permDetail') {
+                window.permDetail(obj);
+            }
+        });
+
+        table.on('toolbar(user-table)', function (obj) {
+            if (obj.event === 'add') {
+                window.add();
+            } else if (obj.event === 'refresh') {
+                window.refresh();
+            } else if (obj.event === 'batchRemove') {
+                window.batchRemove(obj);
+            } else if (obj.event === 'securityConfig') {
+                openSecurityConfig();
+            }
+        });
+
+        form.on('submit(user-query)', function (data) {
+            table.reload('user-table', {
+                where: data.field
+            })
+            return false;
+        });
+
+        form.on('switch(user-enable)', function (obj) {
+            // isEnabled 使用布尔语义，1 表示启用，0 表示停用。
+            let isEnabled = obj.elem.checked ? 1 : 0;
+            // 调用后台切换用户启停状态。
+            patchJson(MODULE_PATH + '/updateEnabled', {
+                userId: this.value,
+                isEnabled: isEnabled
+            }, {
+                defaultMsg: '状态更新失败',
+                success: function (result) {
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg, {icon: 1, time: 1000});
+                    } else {
+                        obj.elem.checked = !obj.elem.checked;
+                        form.render('checkbox');
+                        layer.msg(result.msg || '状态更新失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    obj.elem.checked = !obj.elem.checked;
+                    form.render('checkbox');
+                }
+            });
+        });
+
+        function revertUserSwitch(obj, checked) {
+            obj.elem.checked = checked;
+            form.render('checkbox');
+        }
+
+        form.on('switch(user-online)', function (obj) {
+            let userId = this.value;
+            let userName = $(this).attr('data-user-name') || '';
+            if (obj.elem.checked) {
+                revertUserSwitch(obj, false);
+                layer.msg('在线状态由登录会话决定，不能手动置为在线', {icon: 0, time: 1500});
+                return;
+            }
+            layer.confirm('确认踢出用户「' + userName + '」的全部在线会话？', {
+                icon: 3,
+                title: '踢出全部会话确认'
+            }, function (index) {
+                layer.close(index);
+                // 用户列表在线开关仅用于按用户 ID 清理全部在线会话。
+                patchJson(MODULE_PATH + '/kickSessions', {
+                    userId: userId
+                }, {
+                    defaultMsg: '踢出全部会话失败',
+                    success: function (result) {
+                        if (isAjaxSuccess(result)) {
+                            layer.msg(result.msg || '已踢出全部会话', {icon: 1, time: 1000}, function () {
+                                table.reload('user-table');
+                            });
+                        } else {
+                            revertUserSwitch(obj, true);
+                            layer.msg(result.msg || '踢出全部会话失败', {icon: 2, time: 1500});
+                        }
+                    },
+                    error: function () {
+                        revertUserSwitch(obj, true);
+                    }
+                });
+            }, function () {
+                revertUserSwitch(obj, true);
+            });
+        });
+
+        form.on('switch(user-lock)', function (obj) {
+            // 仅允许解锁；锁定由账号密码错误满 5 次自动写入 is_lock（不入黑名单）。
+            if (obj.elem.checked) {
+                obj.elem.checked = false;
+                form.render('checkbox');
+                layer.msg('锁定由登录失败自动触发，请关闭开关解锁', {icon: 0, time: 1500});
+                return;
+            }
+            // 调用后台解锁并踢掉该用户会话。
+            patchJson(MODULE_PATH + '/unlock', {
+                userId: this.value
+            }, {
+                defaultMsg: '解锁失败',
+                success: function (result) {
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg, {icon: 1, time: 1000});
+                    } else {
+                        obj.elem.checked = true;
+                        form.render('checkbox');
+                        layer.msg(result.msg || '解锁失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    obj.elem.checked = true;
+                    form.render('checkbox');
+                }
+            });
+        });
+
+        function checkAccountUnique(userAccount, callback) {
+            // 调用后台校验登录账号是否已存在。
+            checkUnique(MODULE_PATH + '/checkAccount', {userAccount: userAccount}, callback);
+        }
+
+        function saveUser(data) {
+            let loading = layer.load();
+            // 按表单是否带用户 ID 决定新增或修改用户。
+            (data.field.userId ? putJson : postJson)(MODULE_PATH + (data.field.userId ? '/update' : '/add'), data.field, {
+                defaultMsg: '操作失败',
+                success: function (result) {
+                    layer.close(loading);
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                            layer.closeAll('page');
+                            table.reload('user-table');
+                        });
+                    } else {
+                        layer.msg(result.msg || '操作失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    layer.close(loading);
+                }
+            });
+        }
+
+        form.on('submit(user-save)', function (data) {
+            let originalAccount = $(data.form).find('[name="userAccount"]').attr('data-original-account');
+            if (data.field.userId && originalAccount === data.field.userAccount) {
+                saveUser(data);
+                return false;
+            }
+            checkAccountUnique(data.field.userAccount, function (unique) {
+                if (unique) {
+                    saveUser(data);
+                } else {
+                    layer.msg('登录账号已存在', {icon: 2, time: 1000});
+                }
+            });
+            return false;
+        });
+
+        form.on('submit(user-password-save)', function (data) {
+            if (data.field.userPassword !== data.field.confirmPassword) {
+                layer.msg('两次输入的密码不一致', {icon: 2, time: 1000});
+                return false;
+            }
+            let loading = layer.load();
+            // 调用后台重置指定用户密码。
+            patchJson(MODULE_PATH + '/updatePwd', {
+                userId: data.field.userId,
+                userPassword: data.field.userPassword
+            }, {
+                defaultMsg: '操作失败',
+                success: function (result) {
+                    layer.close(loading);
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                            layer.closeAll('page');
+                        });
+                    } else {
+                        layer.msg(result.msg || '操作失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    layer.close(loading);
+                }
+            });
+            return false;
+        });
+
+        function openUserForm(mode, data) {
+            layer.open({
+                type: 1,
+                title: mode === 'add' ? '新增用户' : '修改用户',
+                offset: mode === 'add' ? 'b' : 'r',
+                anim: mode === 'add' ? 'slideUp' : 'slideLeft',
+                area: mode === 'add' ? ['800px', '70%'] : ['500px', '100%'],
+                shade: 0.1,
+                shadeClose: true,
+                id: mode === 'add' ? 'user-add-layer' : 'user-edit-layer',
+                content: $('#user-add').html(),
+                success: function (layero) {
+                    loadDict(DictTypeCode.SYS_USER_SEX).done(function () {
+                        initUserSexRadio(layero, mode === 'edit' && data ? data.userSex : '');
+                        initUserRoleSelect(layero, mode === 'edit' && data ? data.roleIds : '');
+                        initDeptDropdownSelect({
+                            container: layero,
+                            list: window.deptTreeData,
+                            value: mode === 'edit' && data ? data.deptId : ''
+                        });
+                        form.render(null, 'user-add');
+                        if (mode === 'edit' && data) {
+                            layero.find('[name="userAccount"]').attr('data-original-account', data.userAccount);
+                            form.val('user-add', {
+                                userId: data.userId,
+                                userAccount: data.userAccount,
+                                userName: data.userName,
+                                userEmail: data.userEmail,
+                                userPhone: data.userPhone,
+                                userSex: data.userSex,
+                                postId: data.postId
+                            });
+                        }
+                    });
+                }
+            });
+        }
+        window.add = function () {
+            openUserForm('add', null);
+        }
+
+        window.closeCurrentLayer = function () {
+            layer.close(layer.index);
+        }
+
+        window.edit = function (obj) {
+            openUserForm('edit', obj.data);
+        }
+
+        window.password = function (obj) {
+            layer.open({
+                type: 1,
+                title: '修改密码',
+                offset: 'r',
+                anim: 'slideLeft',
+                area: ['500px', '30%'],
+                shade: 0.1,
+                shadeClose: true,
+                id: 'user-password-layer',
+                content: $('#user-password').html(),
+                success: function () {
+                    form.val('user-password', {
+                        userId: obj.data.userId
+                    });
+                }
+            });
+        }
+
+        // 只读展示用户多角色并集后的最终权限树。
+        function buildUserPermTree(list, parentId) {
+            let nodes = [];
+            (list || []).forEach(function (item) {
+                if (String(item.parentId) === String(parentId)) {
+                    let children = buildUserPermTree(list, item.permId);
+                    let node = {
+                        id: item.permId,
+                        title: item.permName
+                    };
+                    if (children.length) {
+                        node.children = children;
+                        node.spread = false;
+                    }
+                    nodes.push(node);
+                }
+            });
+            return nodes;
+        }
+
+        // 父节点不在并集内时挂到根，避免按钮/子菜单孤儿丢失。
+        function buildUserPermForest(list) {
+            let items = list || [];
+            let idSet = new Set(items.map(function (item) {
+                return String(item.permId);
+            }));
+            let roots = buildUserPermTree(items, '0');
+            items.forEach(function (item) {
+                let parentId = String(item.parentId == null ? '0' : item.parentId);
+                if (parentId === '0' || idSet.has(parentId)) {
+                    return;
+                }
+                let children = buildUserPermTree(items, item.permId);
+                let node = {
+                    id: item.permId,
+                    title: item.permName
+                };
+                if (children.length) {
+                    node.children = children;
+                    node.spread = false;
+                }
+                roots.push(node);
+            });
+            return roots;
+        }
+
+        function cloneUserPermTree(nodes) {
+            return (nodes || []).map(function (node) {
+                let cloned = {
+                    id: node.id,
+                    title: node.title
+                };
+                if (node.children && node.children.length) {
+                    cloned.children = cloneUserPermTree(node.children);
+                    cloned.spread = !!node.spread;
+                }
+                return cloned;
+            });
+        }
+
+        function setUserPermTreeSpread(nodes, spread) {
+            (nodes || []).forEach(function (node) {
+                if (node.children && node.children.length) {
+                    node.spread = spread;
+                    setUserPermTreeSpread(node.children, spread);
+                }
+            });
+        }
+
+        function renderUserPermTree(elem, treeId, list) {
+            let treeData = buildUserPermForest(list);
+            tree.render({
+                elem: elem,
+                id: treeId,
+                data: cloneUserPermTree(treeData),
+                showCheckbox: false,
+                onlyIconControl: true
+            });
+            return treeData;
+        }
+
+        window.permDetail = function (obj) {
+            let titleName = obj.data.userName || obj.data.userAccount || '';
+            layer.open({
+                type: 1,
+                title: '权限详情' + (titleName ? '（' + titleName + '）' : ''),
+                offset: 'r',
+                anim: 'slideLeft',
+                shade: 0.1,
+                shadeClose: true,
+                area: ['480px', '100%'],
+                id: 'user-perm-detail-layer',
+                content: $('#user-perm-panel').html(),
+                success: function (layero) {
+                    let treeId = 'user-perm-tree-' + obj.data.userId;
+                    let baseTreeData = [];
+                    let loading = layer.load();
+                    // 调用后台加载用户最终权限（多角色并集）。
+                    getJson(MODULE_PATH + '/permDetail', {userId: obj.data.userId}, {
+                        defaultMsg: '加载权限详情失败',
+                        success: function (result) {
+                            layer.close(loading);
+                            if (!isAjaxSuccess(result)) {
+                                layer.msg(result.msg || '加载权限详情失败', {icon: 2, time: 1000});
+                                return;
+                            }
+                            let detail = result.data || {};
+                            let roles = detail.roles || [];
+                            let $roles = layero.find('#user-perm-roles');
+                            if (!roles.length) {
+                                $roles.text('无角色');
+                            } else {
+                                let html = roles.map(function (role) {
+                                    return '<span class="layui-badge layui-bg-green" style="margin-right:6px;">'
+                                        + (role.roleName || role.roleId) + '</span>';
+                                }).join('');
+                                $roles.html(html);
+                            }
+                            baseTreeData = renderUserPermTree(
+                                layero.find('#user-perm-tree')[0],
+                                treeId,
+                                detail.perms || []
+                            );
+                            if (!baseTreeData.length) {
+                                layero.find('#user-perm-tree').html('<div style="color:#999;">暂无权限</div>');
+                            }
+                        },
+                        error: function () {
+                            layer.close(loading);
+                        }
+                    });
+                    layero.find('#user-perm-expand').on('click', function () {
+                        if (!baseTreeData.length) {
+                            return;
+                        }
+                        setUserPermTreeSpread(baseTreeData, true);
+                        tree.reload(treeId, {data: cloneUserPermTree(baseTreeData)});
+                    });
+                    layero.find('#user-perm-collapse').on('click', function () {
+                        if (!baseTreeData.length) {
+                            return;
+                        }
+                        setUserPermTreeSpread(baseTreeData, false);
+                        tree.reload(treeId, {data: cloneUserPermTree(baseTreeData)});
+                    });
+                }
+            });
+        }
+
+        window.remove = function (obj) {
+            layer.confirm('确定要删除该用户', {
+                icon: 3,
+                title: '提示'
+            }, function (index) {
+                layer.close(index);
+                let loading = layer.load();
+                // 调用后台删除当前用户。
+                deleteJson(MODULE_PATH + '/delete', {ids: obj.data['userId']}, {
+                    defaultMsg: '删除失败',
+                    success: function (result) {
+                        layer.close(loading);
+                        if (isAjaxSuccess(result)) {
+                            layer.msg(result.msg, {
+                                icon: 1,
+                                time: 1000
+                            }, function () {
+                                obj.del();
+                            });
+                        } else {
+                            layer.msg(result.msg || '删除失败', {
+                                icon: 2,
+                                time: 1000
+                            });
+                        }
+                    },
+                    error: function () {
+                        layer.close(loading);
+                    }
+                })
+            });
+        }
+
+        window.batchRemove = function (obj) {
+
+            var checkIds = getCheckedFieldIds(obj, 'userId');
+
+            if (checkIds === "") {
+                layer.msg("未选中数据", {
+                    icon: 3,
+                    time: 1000
+                });
+                return false;
+            }
+
+            layer.confirm('确定要删除这些用户', {
+                icon: 3,
+                title: '提示'
+            }, function (index) {
+                layer.close(index);
+                let loading = layer.load();
+                // 调用后台批量删除选中的用户。
+                deleteJson(MODULE_PATH + '/delete', {ids: checkIds}, {
+                    defaultMsg: '删除失败',
+                    success: function (result) {
+                        layer.close(loading);
+                        if (isAjaxSuccess(result)) {
+                            layer.msg(result.msg, {
+                                icon: 1,
+                                time: 1000
+                            }, function () {
+                                table.reload('user-table');
+                            });
+                        } else {
+                            layer.msg(result.msg || '删除失败', {
+                                icon: 2,
+                                time: 1000
+                            });
+                        }
+                    },
+                    error: function () {
+                        layer.close(loading);
+                    }
+                })
+            });
+        }
+
+        window.refresh = function (param) {
+            table.reload('user-table');
+        }
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function buildSecurityConfigField(item) {
+            let value = escapeHtml(item.configValue || '');
+            let code = escapeHtml(item.configCode);
+            let id = escapeHtml(item.configId);
+            let name = escapeHtml(item.configName);
+            let inputType = item.valueType === 'number' ? 'number' : 'text';
+            // 安全阈值允许 0（关闭对应策略），不允许负数。
+            return '<div class="layui-form-item" data-config-id="' + id + '" data-config-code="' + code + '" data-value-type="'
+                + escapeHtml(item.valueType) + '"><label class="layui-form-label">' + name + '</label><div class="layui-input-block">'
+                + '<input type="' + inputType + '" min="0" maxlength="1000" value="' + value + '" class="layui-input"></div></div>';
+        }
+
+        function saveSecurityConfig() {
+            let configs = [];
+            $('[lay-filter="security-config-form"] .layui-form-item[data-config-id]').each(function () {
+                let $item = $(this);
+                configs.push({
+                    configId: $item.attr('data-config-id'),
+                    configCode: $item.attr('data-config-code'),
+                    configValue: $item.find('input').val()
+                });
+            });
+            let loading = layer.load();
+            // 复用系统配置分组保存接口。
+            putJson(CONFIG_PATH + '/updateGroup', {configGroup: 'security', configs: configs}, {
+                defaultMsg: '保存安全配置失败',
+                success: function (result) {
+                    layer.close(loading);
+                    if (isAjaxSuccess(result)) {
+                        layer.closeAll();
+                        layer.msg(result.msg, {icon: 1, time: 1000});
+                    } else {
+                        layer.msg(result.msg || '保存安全配置失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    layer.close(loading);
+                }
+            });
+        }
+
+        function openSecurityConfig() {
+            // 加载 security 分组配置，按常规右侧通高抽屉编辑。
+            getJson(CONFIG_PATH + '/group', {configGroup: 'security'}, {
+                defaultMsg: '加载安全配置失败',
+                success: function (result) {
+                    if (!isAjaxSuccess(result)) {
+                        layer.msg(result.msg || '加载安全配置失败', {icon: 2, time: 1000});
+                        return;
+                    }
+                    let configs = result.data || [];
+                    let html = [];
+                    if (!configs.length) {
+                        html.push('<div class="layui-form-item"><div class="layui-input-block">暂无可维护配置</div></div>');
+                    }
+                    configs.forEach(function (item) {
+                        html.push(buildSecurityConfigField(item));
+                    });
+                    $('#security-config-fields').html(html.join(''));
+                    layer.open({
+                        type: 1,
+                        title: '安全配置',
+                        offset: 'l',
+                        anim: 'slideRight',
+                        // 安全配置项变多，用通高抽屉避免底部裁切。
+                        area: ['560px', '100%'],
+                        shade: 0.1,
+                        shadeClose: true,
+                        id: 'security-config-layer',
+                        content: $('#security-config-modal'),
+                        success: function () {
+                            form.render(null, 'security-config-form');
+                        }
+                    });
+                }
+            });
+        }
+
+        form.on('submit(security-config-save)', function () {
+            saveSecurityConfig();
+            return false;
+        });
+    })
+</script>
+<div class="security-config-drawer" id="security-config-modal" style="display: none;">
+    <form class="layui-form" lay-filter="security-config-form" action="">
+        <div class="mainBox">
+            <div class="main-container" id="security-config-fields"></div>
+        </div>
+        <div class="bottom">
+            <div class="button-container">
+                <button type="submit" class="pear-btn pear-btn-primary pear-btn-sm" lay-submit=""
+                        lay-filter="security-config-save">
+                    <i class="layui-icon layui-icon-ok"></i>
+                    提交
+                </button>
+                <button type="button" class="pear-btn pear-btn-sm" onclick="closeCurrentLayer()">
+                    <i class="layui-icon layui-icon-close"></i>
+                    关闭
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+</body>
+</html>

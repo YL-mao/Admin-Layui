@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{include :: header(${systemName})}"></head>
+<!-- 加 载 样 式 -->
+<link rel="stylesheet" th:href="@{/static/admin/css/loader.css}"/>
+<!-- 布 局 样 式 -->
+<link rel="stylesheet" th:href="@{/static/admin/css/admin.css}"/>
+<!-- 结 构 代 码 -->
+<body class="layui-layout-body pear-admin">
+<!-- 布 局 框 架 -->
+<div class="layui-layout layui-layout-admin">
+    <!-- 顶 部 样 式 -->
+    <div class="layui-header">
+        <!-- 菜 单 顶 部 -->
+        <div class="layui-logo">
+            <!-- 图 标 -->
+            <img class="logo">
+            <!-- 标 题 -->
+            <span class="title"></span>
+        </div>
+        <!-- 顶 部 左 侧 功 能 -->
+        <ul class="layui-nav layui-layout-left">
+            <li class="collapse layui-nav-item"><a class="layui-icon layui-icon-shrink-right" href="javascript:;"></a>
+            </li>
+            <li class="refresh layui-nav-item"><a class="layui-icon layui-icon-refresh-1" href="javascript:;"
+                                                  loading=600></a></li>
+        </ul>
+        <!-- 多 系 统 菜 单 -->
+        <div class="layui-layout-control" id="control"></div>
+        <!-- 顶 部 右 侧 菜 单 -->
+        <ul class="layui-nav layui-layout-right">
+            <li class="layui-nav-item layui-hide-xs"><a class="menuSearch layui-icon layui-icon-search"
+                                                        href="javascript:;"></a></li>
+            <li class="layui-nav-item layui-hide-xs"><a class="fullScreen layui-icon layui-icon-screen-full"
+                                                        href="javascript:;"></a></li>
+            <li class="layui-nav-item layui-hide-xs" th:if="${systemWebsiteLinkable}">
+                <a class="layui-icon layui-icon-website" th:href="${systemWebsite}" target="_blank" rel="noopener noreferrer"></a>
+            </li>
+            <li class="layui-nav-item layui-hide-xs message"></li>
+            <li class="layui-nav-item user">
+                <!-- 头 像 -->
+                <a class="layui-icon layui-icon-username" href="javascript:;"></a>
+                <!-- 功 能 菜 单 -->
+                <dl class="layui-nav-child">
+                    <dd><a href="javascript:;" user-menu-id="1220343202867974261" user-menu-title="个人资料"
+                           th:attr="user-menu-url=@{/user/info}">个人资料</a></dd>
+                    <dd><a class="logout" href="javascript:void(0);">注销登录</a></dd>
+                </dl>
+            </li>
+            <!-- 主 题 配 置 -->
+            <li class="layui-nav-item setting"><a class="layui-icon layui-icon-more-vertical" href="javascript:;"></a>
+            </li>
+        </ul>
+    </div>
+    <!-- 侧 边 区 域 -->
+    <div class="layui-side layui-bg-black">
+        <!-- 菜 单 顶 部 -->
+        <div class="layui-logo">
+            <!-- 图 标 -->
+            <img class="logo">
+            <!-- 标 题 -->
+            <span class="title"></span>
+        </div>
+        <!-- 菜 单 内 容 -->
+        <div class="layui-side-scroll">
+            <div id="sideMenu"></div>
+        </div>
+    </div>
+    <!-- 视 图 页 面 -->
+    <div class="layui-body">
+        <!-- 内 容 页 面 -->
+        <div id="content"></div>
+    </div>
+    <!-- 页脚：内容来自 system.*，空配置不展示对应片段。 -->
+    <div class="layui-footer layui-text">
+        <span class="left">
+            <th:block th:if="${!#strings.isEmpty(systemVersion)}">
+                <span th:text="'v' + ${systemVersion}"></span>
+            </th:block>
+            <th:block th:if="${!#strings.isEmpty(systemVersion) and !#strings.isEmpty(systemShortName)}"> · </th:block>
+            <!-- 仅当官网已含 http/https（或 //）时简称可点跳转；备案号不挂链接。 -->
+            <a th:if="${!#strings.isEmpty(systemShortName) and systemWebsiteLinkable}"
+               th:href="${systemWebsite}" th:text="${systemShortName}"
+               target="_blank" rel="noopener noreferrer"></a>
+            <span th:if="${!#strings.isEmpty(systemShortName) and !systemWebsiteLinkable}"
+                  th:text="${systemShortName}"></span>
+        </span>
+        <span class="center">
+            <span th:if="${!#strings.isEmpty(systemIcp)}" th:text="${systemIcp}"></span>
+            <th:block th:if="${!#strings.isEmpty(systemIcp) and !#strings.isEmpty(systemPoliceIcp)}"> · </th:block>
+            <span th:if="${!#strings.isEmpty(systemPoliceIcp)}" th:text="${systemPoliceIcp}"></span>
+        </span>
+        <span class="right" th:text="${systemCopyright}"></span>
+    </div>
+    <!-- 遮 盖 层 -->
+    <div class="pear-cover"></div>
+    <!-- 加 载 动 画 -->
+    <div class="loader-main">
+        <!-- 动 画 对 象 -->
+        <div class="loader"></div>
+    </div>
+</div>
+<!-- 移 动 端 便 捷 操 作 -->
+<div class="pear-collapsed-pe collapse">
+    <a class="layui-icon layui-icon-shrink-right" href="javascript:"></a>
+</div>
+<!-- 依 赖 脚 本 -->
+<th:block th:insert="~{include :: footer}"/>
+<!-- 框 架 初 始 化 -->
+<script th:inline="javascript">
+    /* global layui, apiPath */
+    // 服务端注入的 system.*，覆盖 pear.config.yml 中的品牌占位。
+    var systemLogo = /*[[${systemLogo}]]*/ '';
+    var systemName = /*[[${systemName}]]*/ '';
+    var systemShortName = /*[[${systemShortName}]]*/ '';
+    layui.use(['admin', 'common', 'jquery', 'layer'], function () {
+        var $ = layui.jquery;
+        var admin = layui.admin;
+        var layer = layui.layer;
+
+        admin.setConfigType("yml");
+        admin.setConfigPath("/static/config/pear.config.yml");
+        var config = admin.readConfig();
+        if (!config && window.PEAR_STATIC_DATA && window.PEAR_STATIC_DATA.config) {
+            config = window.PEAR_STATIC_DATA.config;
+        }
+        if (config) {
+            if (config.header && config.header.message) {
+                config.header.message = apiPath + '/user/notice/header';
+            }
+            config.logo = config.logo || {};
+            // 无兜底：直接使用库配置；空值则侧栏标题/图标为空。静态路径需拼上 apiPath。
+            config.logo.image = systemLogo ? (apiPath + systemLogo) : '';
+            config.logo.title = systemName || systemShortName || '';
+            // 页脚内容由模板渲染，这里打开 Pear 页脚显示开关。
+            config.other = config.other || {};
+            config.other.footer = true;
+            // Pear 开启 tab.session 后会记住旧 Tab；首页路由变更时校正 sessionStorage，避免仍打开已删除地址。
+            syncHomeTabSession(config);
+            admin.render(config);
+        }
+
+        /**
+         * 校正 sessionStorage 中的 Tab：保证存在且仅有一个不可关闭的「首页」Tab。
+         * 固定首页由 pear.config.tab.index 决定，与侧栏菜单名称是否叫「首页」无关。
+         */
+        function syncHomeTabSession(cfg) {
+            if (!cfg || !cfg.tab || !cfg.tab.index || !cfg.tab.session) {
+                return;
+            }
+            var dataKey = 'content-pear-tab-data';
+            var currentKey = 'content-pear-tab-data-current';
+            var homeId = String(cfg.tab.index.id);
+            var homeHref = cfg.tab.index.href;
+            var homeTitle = cfg.tab.index.title || '后台首页';
+            var raw = sessionStorage.getItem(dataKey);
+            var tabs = [];
+            if (raw) {
+                try {
+                    tabs = JSON.parse(raw);
+                    if (!Array.isArray(tabs)) {
+                        tabs = [];
+                    }
+                } catch (e) {
+                    tabs = [];
+                }
+            }
+
+            var homeTab = {
+                id: homeId,
+                url: homeHref,
+                title: homeTitle,
+                close: false
+            };
+            var others = [];
+            tabs.forEach(function (tab) {
+                if (!tab) {
+                    return;
+                }
+                var url = tab.url || '';
+                var isHomeTab = String(tab.id) === homeId;
+                var isDeprecated = url.indexOf('/serviceController/') === 0
+                    || url.indexOf('/console/console') === 0
+                    || url === homeHref;
+                // 首页 / 废弃路由都收敛到固定首页，其它业务 Tab 保留并可关闭。
+                if (isHomeTab || isDeprecated) {
+                    return;
+                }
+                tab.close = true;
+                others.push(tab);
+            });
+
+            sessionStorage.setItem(dataKey, JSON.stringify([homeTab].concat(others)));
+            var current = sessionStorage.getItem(currentKey);
+            var currentExists = current && ([homeId].concat(others.map(function (t) {
+                return String(t.id);
+            }))).indexOf(String(current)) !== -1;
+            if (!currentExists || current === '10') {
+                sessionStorage.setItem(currentKey, homeId);
+            }
+        }
+
+        // 登出：先调后端清 Session，再跳转登录页。
+        admin.logout(function () {
+            postJson(apiPath + '/admin/loginOut', null, {
+                defaultMsg: '注销失败',
+                success: function (result) {
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg || '注销成功', {icon: 1, time: 1000}, function () {
+                            location.href = apiPath + '/login';
+                        });
+                    } else {
+                        layer.msg(result.msg || '注销失败', {icon: 2, time: 1200});
+                    }
+                }
+            });
+            return false;
+        })
+
+        function openNoticeListTab() {
+            admin.addTab('1220343202867974260', '公告列表', apiPath + '/user/notice');
+        }
+
+        // 点击顶部未读公告，直接打开「公告列表」菜单页。
+        admin.message(openNoticeListTab);
+
+        // 供公告列表 iframe 标已读后刷新顶部铃铛。
+        window.refreshNoticeHeader = function () {
+            admin.refreshMessage();
+        };
+    })
+</script>
+</body>
+</html>

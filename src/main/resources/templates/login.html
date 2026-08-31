@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{include :: header(${systemName})}"></head>
+<link rel="stylesheet" th:href="@{/static/admin/css/other/login.css}"/>
+<!-- 代 码 结 构 -->
+<body class="login-page">
+<!-- 全屏背景层：固定视口 + cover，与 Git 版 body 背景策略一致，避免 attachment:fixed 产生色带 -->
+<div class="login-page-bg" th:style="'background-image:url(' + @{/static/admin/images/background.svg} + ')'"></div>
+<form action="javascript:void(0);" class="layui-form">
+    <div class="layui-form-item">
+        <div class="login-brand">
+            <img class="logo" th:if="${!#strings.isEmpty(systemLogo)}" th:src="@{${systemLogo}}"/>
+            <div class="title" th:if="${!#strings.isEmpty(systemName)}" th:text="${systemName}"></div>
+        </div>
+        <div class="desc" th:if="${!#strings.isEmpty(systemCopyright)}" th:text="${systemCopyright}"></div>
+    </div>
+    <div class="layui-form-item">
+        <input class="layui-input" hover lay-verify="required" name="userAccount" placeholder="账 户 : admin "
+               type="text"/>
+    </div>
+    <div class="layui-form-item">
+        <input class="layui-input" hover lay-affix="eye" lay-verify="required" name="userPassword"
+               placeholder="密 码 : admin " type="password"/>
+    </div>
+    <div class="layui-form-item">
+        <input class="code layui-input layui-input-inline" hover lay-verify="required" name="captcha"
+               placeholder="验证码 : "/>
+        <img class="codeImage" id="captchaImage" alt="验证码" src=""/>
+    </div>
+    <div class="layui-form-item">
+        <input lay-skin="primary" name="rememberMe" title="记住密码" type="checkbox">
+    </div>
+    <div class="layui-form-item">
+        <button class="pear-btn pear-btn-success login" lay-filter="login" lay-submit type="button">
+            登 入
+        </button>
+    </div>
+</form>
+<!-- 资 源 引 入 -->
+<th:block th:insert="~{include :: footer}"/>
+<script>
+    /* global layui, apiPath, getAjaxErrorMsg */
+    layui.use(['common', 'form', 'jquery', 'layer'], function () {
+        var form = layui.form;
+        var $ = layui.jquery;
+        var layer = layui.layer;
+        var captchaBlobUrl = null;
+
+        // 通过 fetch 拉验证码图，兼容超限时仍返回 image/*（避免 img 直链吃到 JSON）。
+        function loadCaptcha() {
+            var url = apiPath + '/captcha/captchaImage?type=char&s=' + Math.random();
+            fetch(url, {credentials: 'same-origin', cache: 'no-store'})
+                .then(function (res) {
+                    if (!res.ok) {
+                        throw new Error('captcha http ' + res.status);
+                    }
+                    return res.blob();
+                })
+                .then(function (blob) {
+                    var img = document.getElementById('captchaImage');
+                    if (captchaBlobUrl) {
+                        URL.revokeObjectURL(captchaBlobUrl);
+                    }
+                    captchaBlobUrl = URL.createObjectURL(blob);
+                    img.src = captchaBlobUrl;
+                })
+                .catch(function () {
+                    layer.msg('验证码加载失败', {icon: 2, time: 1000});
+                });
+        }
+
+        loadCaptcha();
+
+        form.on('submit(login)', function (data) {
+            $(".login").attr("disabled", "disabled")
+            var loader = layer.load();
+            $(".login").html("<i class='layui-icon layui-anim layui-anim-rotate layui-anim-loop layui-icon-loading' />");
+            // 提交登录；失败后刷新验证码。
+            postJson(apiPath + '/login', {
+                userAccount: data.field.userAccount,
+                userPassword: data.field.userPassword,
+                captcha: data.field.captcha,
+                rememberMe: !!data.field.rememberMe
+            }, {
+                defaultMsg: '登录失败',
+                success: function (result) {
+                    var loginJq = $(".login");
+                    if (isAjaxSuccess(result)) {
+
+                        layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                            // replace 避免登录页留在历史栈，后退不会回到登录表单。
+                            location.replace(apiPath + '/admin/index');
+                        })
+                    } else {
+                        layer.msg(result.msg, {icon: 2, time: 1000}, function () {
+                            loadCaptcha();
+                        });
+                        loginJq.removeAttr("disabled");
+                    }
+                    loginJq.html("登 入")
+                    layer.close(loader);
+                },
+                error: function () {
+                    var loginJq = $(".login");
+                    loadCaptcha();
+                    loginJq.removeAttr("disabled");
+                    loginJq.html("登 入");
+                    layer.close(loader);
+                }
+            });
+            return false;
+        });
+
+        // 点击验证码图手动刷新（已去掉 30 秒自动刷新，降低撞限流概率）。
+        $("#captchaImage").click(function () {
+            loadCaptcha();
+        });
+
+        validateKickOut(layer);
+
+    });
+
+    function validateKickOut(layer) {
+        if (getParam("kickOut") === "1") {
+            layer.alert("<font color='red'>您已在别处登录，请您修改密码或重新登录</font>", {
+                    icon: 0,
+                    title: "系统提示"
+                },
+                function (index) {
+                    layer.close(index);
+                });
+        } else if (getParam("sessionOut") === "1") {
+            layer.alert("<font color='red'>登录已过期，请重新登录</font>", {
+                    icon: 0,
+                    title: "系统提示"
+                },
+                function (index) {
+                    layer.close(index);
+                });
+        }
+    }
+
+    function getParam(paramName) {
+        var reg = new RegExp("(^|&)" + paramName + "=([^&]*)(&|$)");
+        var r = window.location.search.substr(1).match(reg);
+        if (r != null) return decodeURI(r[2]);
+        return null;
+    }
+</script>
+<script>
+    if (window !== top) {
+        top.location.href = location.href;
+    }
+</script>
+</body>
+</html>

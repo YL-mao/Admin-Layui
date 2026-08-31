@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{include :: header('接口文档')}"></head>
+<body class="pear-container" style="padding: 0; height: calc(100vh - 20px);">
+<div th:if="${apiDocsEnabled}" style="height: 100%;">
+    <!-- 内嵌 springdoc Swagger UI；需已登录，Cookie 同域自动携带。 -->
+    <iframe th:src="@{/swagger-ui/index.html}" title="Swagger UI"
+            style="width: 100%; height: 100%; border: 0;"></iframe>
+</div>
+<div th:unless="${apiDocsEnabled}" class="layui-card" style="margin: 15px;">
+    <div class="layui-card-body">
+        <blockquote class="layui-elem-quote">
+            当前环境已关闭在线接口文档（<code>springdoc.api-docs.enabled=false</code>）。
+            开发环境默认开启；书面约定见仓库 <code>doc/接口文档与开发说明.md</code>。
+        </blockquote>
+    </div>
+</div>
+<th:block th:insert="~{include :: footer}"/>
+</body>
+</html>

@@ -1,0 +1,98 @@
+# 各环境共用；具体环境见 application-dev.yml / application-prod.yml
+spring:
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    # 与 app.timezone 保持同一业务时区，避免 JSON 序列化另走 GMT+8。
+    time-zone: ${app.timezone}
+  servlet:
+    # 容器层放宽；业务仍按 upload.maxFileSzMb 校验。
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+  mvc:
+    static-path-pattern: /static/**
+  thymeleaf:
+    mode: HTML
+    prefix: classpath:/templates/
+    suffix: .html
+    encoding: utf-8
+  profiles:
+    default: dev
+
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.ylmao.admin.entity
+
+sa-token:
+  # token 名称；同域后台写入 Cookie，其它终端/离开后台的请求通过同名请求头 saToken 传递。
+  token-name: saToken
+  # token 有效期，单位秒；2592000 = 30 天，-1 表示永久有效。
+  timeout: 2592000
+  # token 最低活跃时间，单位秒；-1 表示不限制活跃时间。
+  active-timeout: -1
+  # 是否启用动态 active-timeout；一般不需要动态设置时关闭，减少缓存访问。
+  dynamic-active-timeout: false
+  # 是否允许同一账号多端同时登录；false 表示新登录会挤掉旧登录。
+  is-concurrent: false
+  # 多端登录时是否共用同一个 token；当前项目每次登录生成独立 token。
+  is-share: false
+  # is-concurrent=false 时，新旧设备谁放弃会话；OLD_DEVICE 表示旧设备下线。
+  replaced-login-exit-mode: OLD_DEVICE
+  # is-concurrent=false 时，顶人下线范围；CURR_DEVICE_TYPE 表示当前设备类型。
+  replaced-range: CURR_DEVICE_TYPE
+  # 同一账号最大登录数量；仅在 is-concurrent=true 且 is-share=false 时生效。
+  max-login-count: 12
+  # 超出最大登录数量后的处理方式；LOGOUT 表示注销最早登录的会话。
+  overflow-logout-mode: LOGOUT
+  # 创建 token 时为保证唯一性的最大重试次数；-1 表示不循环重试。
+  max-try-times: 12
+  # 是否从请求体读取 token。
+  is-read-body: false
+  # 是否从请求头读取 token；App、脚本、跨域 Web 等离开同域后台的客户端使用 saToken 请求头。
+  is-read-header: true
+  # 是否从 Cookie 读取 token；同域 Thymeleaf 后台（页面跳转与同域 Ajax）由浏览器自动携带 Cookie。
+  is-read-cookie: true
+  # 是否写入持久 Cookie；登录后供同域后台页面与 Ajax 使用。
+  is-lasting-cookie: true
+  # 登录后是否把 token 写入响应头；当前登录流程由前端按返回结果自行处理。
+  is-write-header: false
+  # 注销范围；TOKEN 表示只注销当前 token，ACCOUNT 表示注销账号全部会话。
+  logout-range: TOKEN
+  # token 冻结后是否仍允许注销、踢人等操作；默认关闭。
+  is-logout-keep-freeze-ops: false
+  # 注销 token 后是否保留对应 Token-Session；默认不保留。
+  is-logout-keep-token-session: false
+  # 登录时是否立即创建 Token-Session；false 表示首次使用时再创建。
+  right-now-create-token-session: false
+  # token 生成风格，可选 uuid、simple-uuid、random-32、random-64、random-128、tik。
+  token-style: uuid
+  # 默认持久组件清理过期数据的间隔，单位秒；-1 表示不启动定时清理。
+  data-refresh-period: 30
+  # 获取 Token-Session 时是否必须校验登录，开启可防止伪造 token 获取会话。
+  token-session-check-login: true
+  # 是否自动续签 active-timeout；active-timeout=-1 时该配置影响较小。
+  auto-renew: true
+  # token 前缀，例如 Bearer；为空表示请求头直接传 token 值。
+  token-prefix:
+  # Cookie 模式是否自动补 token 前缀；同域后台 Cookie 与请求头均直接传 token 值，不加 Bearer 等前缀。
+  cookie-auto-fill-prefix: false
+  # 启动时是否打印 Sa-Token 版本字符画。
+  is-print: true
+  # 是否输出 Sa-Token 操作日志。
+  is-log: false
+  # Sa-Token 日志等级，可选 trace、debug、info、warn、error、fatal。
+  log-level: trace
+  # Sa-Token 日志等级数值；1=trace，2=debug，3=info，4=warn，5=error，6=fatal。
+  log-level-int: 1
+  # 是否打印彩色日志；空值表示由框架根据运行终端自行判断。
+  is-color-log:
+  # 当前项目网络访问地址；为空时由框架按请求上下文处理。
+  curr-domain:
+
+# 脚手架辅助开关
+app:
+  # 唯一业务时区（部署契约，改后需重启）；空或非法值将导致启动失败。
+  timezone: Asia/Shanghai
+  # 启动时权限与路由质量检查（只 WARN，不拦启动）；设为 false 可关闭。
+  perm:
+    quality-check: true

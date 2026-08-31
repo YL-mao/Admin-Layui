@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sa="https://www.thymeleaf.org/extras/sa-token">
+<head th:replace="~{include :: header('在线用户')}"></head>
+<body class="pear-container">
+<div class="layui-card">
+    <div class="layui-card-body">
+        <form class="layui-form" action="">
+            <div class="layui-form-item">
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">账号/用户名</label>
+                    <div class="layui-input-inline">
+                        <input type="text" name="userAccount" maxlength="64" placeholder="账号或用户名" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">登录IP</label>
+                    <div class="layui-input-inline">
+                        <input type="text" name="loginIp" maxlength="64" placeholder="请输入登录IP" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <button class="pear-btn pear-btn-md pear-btn-primary" lay-submit lay-filter="online-query">
+                        <i class="layui-icon layui-icon-search"></i>
+                        查询
+                    </button>
+                    <button type="reset" class="pear-btn pear-btn-md">
+                        <i class="layui-icon layui-icon-refresh"></i>
+                        重置
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="layui-card">
+    <div class="layui-card-body">
+        <table id="online-table" lay-filter="online-table"></table>
+    </div>
+</div>
+
+<script type="text/html" id="online-status" th:inline="none">
+{{# if(d.userId === window.currentUserId){ }}
+    <input type="checkbox" name="onlineStatus" value="{{d.tokenValue}}" data-user-id="{{d.userId}}" data-user-name="{{d.userName || d.userAccount || ''}}"
+           lay-skin="switch" lay-text="在线|离线" lay-filter="online-status" checked disabled />
+{{# } else { }}
+    <input type="checkbox" name="onlineStatus" value="{{d.tokenValue}}" data-user-id="{{d.userId}}" data-user-name="{{d.userName || d.userAccount || ''}}"
+           lay-skin="switch" lay-text="在线|离线" lay-filter="online-status" checked />
+{{# } }}
+</script>
+
+<th:block th:insert="~{include :: footer}"/>
+<script th:inline="javascript">
+    window.currentUserId = /*[[${currentUserId}]]*/ '';
+</script>
+<script th:inline="none">
+    layui.use(['common', 'table', 'form', 'jquery', 'layer'], function () {
+        let table = layui.table;
+        let form = layui.form;
+        let $ = layui.jquery;
+        let layer = layui.layer;
+        let MODULE_PATH = apiPath + '/online';
+
+        let cols = [
+            [
+                {title: '账号', field: 'userAccount', align: 'center', minWidth: 110},
+                {title: '用户名', field: 'userName', align: 'center', minWidth: 110},
+                {title: '登录IP', field: 'loginIp', align: 'center', minWidth: 120},
+                {title: '登录时间', field: 'loginTime', align: 'center', minWidth: 160},
+                {title: '浏览器', field: 'browser', align: 'center', width: 100},
+                {title: '操作系统', field: 'systemOs', align: 'center', width: 110},
+                {title: '剩余有效期', field: 'timeoutText', align: 'center', minWidth: 110},
+                {title: 'Token', field: 'tokenDisplay', align: 'center', minWidth: 160},
+                {title: '在线', field: 'self', templet: '#online-status', align: 'center', width: 120, fixed: 'right'}
+            ]
+        ];
+
+        // 从后台分页加载当前有效 Token 会话列表。
+        table.render({
+            response: TABLE_RESPONSE,
+            elem: '#online-table',
+            url: MODULE_PATH + '/list',
+            page: true,
+            cols: cols,
+            skin: 'line',
+            defaultToolbar: [{
+                title: '刷新',
+                layEvent: 'refresh',
+                icon: 'layui-icon-refresh'
+            }, 'filter'],
+            done: function () {
+                form.render('checkbox');
+            }
+        });
+
+        table.on('toolbar(online-table)', function (obj) {
+            if (obj.event === 'refresh') {
+                table.reload('online-table');
+            }
+        });
+
+        form.on('submit(online-query)', function (data) {
+            table.reload('online-table', {where: data.field, page: {curr: 1}});
+            return false;
+        });
+
+        function reloadOnlineTable(message) {
+            layer.msg(message, {icon: 1, time: 1000}, function () {
+                table.reload('online-table');
+            });
+        }
+
+        function requestOnlineKick(url, payload, defaultMsg, successMsg) {
+            // 状态变更类强退与用户模块踢会话统一用 PATCH。
+            patchJson(url, payload, {
+                defaultMsg: defaultMsg,
+                success: function (result) {
+                    if (isAjaxSuccess(result)) {
+                        reloadOnlineTable(result.msg || successMsg);
+                    } else {
+                        layer.msg(result.msg || defaultMsg, {icon: 2, time: 1500});
+                    }
+                }
+            });
+        }
+
+        form.on('switch(online-status)', function (obj) {
+            let tokenValue = this.value;
+            let userId = $(this).attr('data-user-id');
+            let userName = $(this).attr('data-user-name') || '';
+            obj.elem.checked = true;
+            form.render('checkbox');
+            layer.open({
+                title: '强退确认',
+                content: '请选择会话踢出方式：' + userName,
+                btn: ['只踢当前会话', '踢该用户全部会话', '取消'],
+                yes: function (index) {
+                    layer.close(index);
+                    // 在线用户页可按当前 token 只踢本会话。
+                    requestOnlineKick(MODULE_PATH + '/kick', {tokenValue: tokenValue}, '强退失败', '已强退');
+                },
+                btn2: function (index) {
+                    layer.close(index);
+                    // 在线用户页也支持按 userId 一次踢出该用户全部会话。
+                    requestOnlineKick(MODULE_PATH + '/kickUser', {userId: userId}, '踢出全部会话失败', '已踢出全部会话');
+                    return false;
+                }
+            });
+            return false;
+        });
+    });
+</script>
+</body>
+</html>

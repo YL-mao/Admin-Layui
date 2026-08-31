@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sa="https://www.thymeleaf.org/extras/sa-token">
+<head th:replace="~{include :: header('定时任务')}"></head>
+<body class="pear-container">
+<div class="layui-card">
+    <div class="layui-card-body">
+        <form class="layui-form" action="">
+            <div class="layui-form-item">
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">任务名称</label>
+                    <div class="layui-input-inline">
+                        <input type="text" name="jobName" maxlength="100" placeholder="请输入任务名称" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">任务编码</label>
+                    <div class="layui-input-inline">
+                        <input type="text" name="jobCode" maxlength="64" placeholder="请输入任务编码" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">状态</label>
+                    <div class="layui-input-inline">
+                        <select name="isEnabled">
+                            <option value="">全部</option>
+                            <option value="1">启用</option>
+                            <option value="0">停用</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <button class="pear-btn pear-btn-md pear-btn-primary" lay-submit lay-filter="job-query">
+                        <i class="layui-icon layui-icon-search"></i>
+                        查询
+                    </button>
+                    <button type="reset" class="pear-btn pear-btn-md">
+                        <i class="layui-icon layui-icon-refresh"></i>
+                        重置
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="layui-card">
+    <!-- 任务配置放在筛选区与表格之间的卡片头，对齐日志配置入口。 -->
+    <div class="layui-card-header">
+        <button sa:hasPermission="system:config:job" type="button" class="pear-btn pear-btn-md" id="btn-job-config">
+            <i class="layui-icon layui-icon-set"></i> 任务配置
+        </button>
+    </div>
+    <div class="layui-card-body">
+        <table id="job-table" lay-filter="job-table"></table>
+    </div>
+</div>
+
+<div id="job-config-modal" style="display:none;">
+    <form class="layui-form" lay-filter="job-config-form" action="">
+        <div class="mainBox">
+            <div class="main-container" id="job-config-fields"></div>
+        </div>
+        <div class="bottom">
+            <div class="button-container">
+                <button type="submit" class="pear-btn pear-btn-primary pear-btn-sm" lay-submit=""
+                        lay-filter="job-config-save">
+                    <i class="layui-icon layui-icon-ok"></i>
+                    提交
+                </button>
+                <button type="button" class="pear-btn pear-btn-sm" id="btn-job-config-close">
+                    <i class="layui-icon layui-icon-close"></i>
+                    关闭
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script type="text/html" id="job-enabled" th:inline="none">
+{{# if(d.isEnabled == 1){ }}
+    <input sa:hasPermission="system:job:updateEnabled" type="checkbox" name="isEnabled" value="{{d.jobId}}" lay-skin="switch" lay-text="启用|停用" lay-filter="job-enabled" checked />
+{{# } else { }}
+    <input sa:hasPermission="system:job:updateEnabled" type="checkbox" name="isEnabled" value="{{d.jobId}}" lay-skin="switch" lay-text="启用|停用" lay-filter="job-enabled" />
+{{# } }}
+</script>
+
+<script type="text/html" id="job-run-status" th:inline="none">
+{{# if(d.runStatus === 'SUCCESS'){ }}
+    <span class="layui-font-green">成功</span>
+{{# } else if(d.runStatus === 'FAILED'){ }}
+    <span class="layui-font-red">失败</span>
+{{# } else { }}
+    <span class="layui-font-gray">—</span>
+{{# } }}
+</script>
+
+<!-- 中文周期说明；悬停显示原始 Cron。 -->
+<script type="text/html" id="job-cron" th:inline="none">
+<span title="{{= d.jobCron || '' }}">{{= d.jobCronDesc || d.jobCron || '' }}</span>
+</script>
+
+<script type="text/html" id="job-bar">
+    <button sa:hasPermission="system:job:run" class="pear-btn pear-btn-warming pear-btn-sm" lay-event="run" title="手动执行">
+        <i class="layui-icon layui-icon-play"></i>
+    </button>
+    <button sa:hasPermission="system:job:log" class="pear-btn pear-btn-primary pear-btn-sm" lay-event="log" title="执行日志">
+        <i class="layui-icon layui-icon-log"></i>
+    </button>
+</script>
+
+<th:block th:insert="~{include :: footer}"/>
+<!-- th:inline=none：避免 JS 中 [[...]] 被 Thymeleaf 当成内联表达式解析。 -->
+<script th:inline="none">
+    layui.use(['common', 'table', 'form', 'jquery'], function () {
+        let table = layui.table;
+        let form = layui.form;
+        let $ = layui.jquery;
+        let MODULE_PATH = apiPath + '/job';
+        let CONFIG_PATH = apiPath + '/config';
+        let jobConfigLayerIndex = null;
+
+        let cols = [
+            [
+                {title: '任务名称', field: 'jobName', align: 'center', minWidth: 140},
+                {title: '任务编码', field: 'jobCode', align: 'center', minWidth: 140},
+                {title: '执行周期', field: 'jobCronDesc', align: 'center', minWidth: 120, templet: '#job-cron'},
+                {title: '说明', field: 'jobDesc', align: 'center', minWidth: 180},
+                {title: '状态', field: 'isEnabled', align: 'center', width: 100, templet: '#job-enabled'},
+                {title: '最近执行', field: 'lastRunTime', align: 'center', minWidth: 160},
+                {title: '执行结果', field: 'runStatus', align: 'center', width: 100, templet: '#job-run-status'},
+                {title: '下次执行', field: 'nextRunTime', align: 'center', minWidth: 160},
+                {title: '操作', toolbar: '#job-bar', align: 'center', width: 120, fixed: 'right'}
+            ]
+        ];
+
+        // 从后台分页加载内置定时任务列表。
+        table.render({
+            response: TABLE_RESPONSE,
+            elem: '#job-table',
+            url: MODULE_PATH + '/list',
+            page: true,
+            cols: cols,
+            skin: 'line',
+            defaultToolbar: [{
+                title: '刷新',
+                layEvent: 'refresh',
+                icon: 'layui-icon-refresh'
+            }, 'filter']
+        });
+
+        table.on('toolbar(job-table)', function (obj) {
+            if (obj.event === 'refresh') {
+                table.reload('job-table');
+            }
+        });
+
+        form.on('submit(job-query)', function (data) {
+            table.reload('job-table', {where: data.field, page: {curr: 1}});
+            return false;
+        });
+
+        $('#btn-job-config').on('click', function () {
+            openJobConfig();
+        });
+
+        form.on('submit(job-config-save)', function () {
+            saveJobConfig();
+            return false;
+        });
+
+        form.on('switch(job-enabled)', function (obj) {
+            let isEnabled = obj.elem.checked ? 1 : 0;
+            // 调用后台切换任务启停（落库，重启后仍生效）。
+            patchJson(MODULE_PATH + '/updateEnabled', {
+                jobId: this.value,
+                isEnabled: isEnabled
+            }, {
+                defaultMsg: '状态更新失败',
+                success: function (result) {
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg, {icon: 1, time: 1000});
+                    } else {
+                        obj.elem.checked = !obj.elem.checked;
+                        form.render('checkbox');
+                        layer.msg(result.msg || '状态更新失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    obj.elem.checked = !obj.elem.checked;
+                    form.render('checkbox');
+                }
+            });
+        });
+
+        table.on('tool(job-table)', function (obj) {
+            if (obj.event === 'run') {
+                window.runJob(obj.data);
+            } else if (obj.event === 'log') {
+                window.openJobLog(obj.data);
+            }
+        });
+
+        window.runJob = function (data) {
+            layer.confirm('确认立即执行任务「' + data.jobName + '」？', {icon: 3, title: '手动执行'}, function (index) {
+                layer.close(index);
+                let loading = layer.load();
+                // 调用后台手动触发任务（不受启停开关限制）。
+                postJson(MODULE_PATH + '/run', {jobId: data.jobId}, {
+                    defaultMsg: '执行失败',
+                    success: function (result) {
+                        layer.close(loading);
+                        if (isAjaxSuccess(result)) {
+                            layer.msg(result.msg || '执行完成', {icon: 1, time: 1000}, function () {
+                                table.reload('job-table');
+                            });
+                        } else {
+                            layer.msg(result.msg || '执行失败', {icon: 2, time: 1500});
+                            table.reload('job-table');
+                        }
+                    },
+                    error: function () {
+                        layer.close(loading);
+                        table.reload('job-table');
+                    }
+                });
+            });
+        };
+
+        /** 右侧宽抽屉打开独立执行日志页。 */
+        window.openJobLog = function (data) {
+            let titleName = data.jobName || '';
+            let qs = 'jobId=' + encodeURIComponent(data.jobId || '')
+                + '&jobName=' + encodeURIComponent(titleName)
+                + '&jobCode=' + encodeURIComponent(data.jobCode || '');
+            layer.open({
+                type: 2,
+                title: '执行日志' + (titleName ? '（' + titleName + '）' : ''),
+                offset: 'r',
+                anim: 'slideLeft',
+                shade: 0.1,
+                shadeClose: true,
+                area: ['70%', '100%'],
+                id: 'job-log-layer',
+                content: MODULE_PATH + '/logView?' + qs
+            });
+        };
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function buildJobConfigField(item) {
+            let value = escapeHtml(item.configValue || '');
+            let code = escapeHtml(item.configCode);
+            let id = escapeHtml(item.configId);
+            let name = escapeHtml(item.configName);
+            let inputType = item.valueType === 'number' ? 'number' : 'text';
+            // 长标签加宽 + nowrap；短数字用官方 input-inline（默认约 190px，避免过窄不对称）。
+            // 扫描间隔最低 60 秒，无上限。
+            let attrs = '';
+            if (item.configCode === 'job.scanSecs') {
+                attrs = ' min="60" step="1"';
+            }
+            return '<div class="layui-form-item" data-config-id="' + id + '" data-config-code="' + code
+                + '" data-value-type="' + escapeHtml(item.valueType) + '">'
+                + '<label class="layui-form-label" style="width: 120px; white-space: nowrap;">' + name + '</label>'
+                + '<div class="layui-input-inline">'
+                + '<input type="' + inputType + '" maxlength="1000" value="' + value + '" class="layui-input"' + attrs + '>'
+                + '</div></div>';
+        }
+
+        function openJobConfig() {
+            // 加载 job 分组配置，左侧短抽屉编辑。
+            getJson(CONFIG_PATH + '/group', {configGroup: 'job'}, {
+                defaultMsg: '加载任务配置失败',
+                success: function (result) {
+                    if (!isAjaxSuccess(result)) {
+                        layer.msg(result.msg || '加载任务配置失败', {icon: 2, time: 1000});
+                        return;
+                    }
+                    let configs = result.data || [];
+                    let html = [];
+                    if (!configs.length) {
+                        html.push('<div class="layui-form-item"><div class="layui-input-block">暂无可维护配置</div></div>');
+                    }
+                    configs.forEach(function (item) {
+                        html.push(buildJobConfigField(item));
+                    });
+                    $('#job-config-fields').html(html.join(''));
+                    layer.open({
+                        type: 1,
+                        title: '任务配置',
+                        offset: 'l',
+                        anim: 'slideRight',
+                        // 仅一项短字段，抽屉收窄避免右侧大片空白。
+                        area: ['420px', '36%'],
+                        shade: 0.1,
+                        shadeClose: true,
+                        id: 'job-config-layer',
+                        content: $('#job-config-modal'),
+                        success: function (layero, index) {
+                            jobConfigLayerIndex = index;
+                            form.render(null, 'job-config-form');
+                            $('#btn-job-config-close').off('click').on('click', closeJobConfigLayer);
+                        }
+                    });
+                }
+            });
+        }
+
+        function saveJobConfig() {
+            let configs = [];
+            let invalidMsg = '';
+            $('[lay-filter="job-config-form"] .layui-form-item[data-config-id]').each(function () {
+                let $item = $(this);
+                let code = $item.attr('data-config-code');
+                let configValue = $item.find('input,textarea,select').val();
+                if (code === 'job.scanSecs') {
+                    let seconds = Number(configValue);
+                    if (!Number.isInteger(seconds) || seconds < 60) {
+                        invalidMsg = '任务扫描间隔秒须为不小于 60 的整数';
+                        return false;
+                    }
+                }
+                configs.push({
+                    configId: $item.attr('data-config-id'),
+                    configCode: code,
+                    configValue: configValue
+                });
+            });
+            if (invalidMsg) {
+                layer.msg(invalidMsg, {icon: 0, time: 1500});
+                return;
+            }
+            let loading = layer.load();
+            // 复用系统配置分组保存接口。
+            putJson(CONFIG_PATH + '/updateGroup', {configGroup: 'job', configs: configs}, {
+                defaultMsg: '保存任务配置失败',
+                success: function (result) {
+                    layer.close(loading);
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg || '保存成功', {icon: 1, time: 1000}, closeJobConfigLayer);
+                    } else {
+                        layer.msg(result.msg || '保存任务配置失败', {icon: 2, time: 1500});
+                    }
+                },
+                error: function () {
+                    layer.close(loading);
+                }
+            });
+        }
+
+        function closeJobConfigLayer() {
+            if (jobConfigLayerIndex != null) {
+                layer.close(jobConfigLayerIndex);
+                jobConfigLayerIndex = null;
+            }
+        }
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{include :: header('个人资料')}"></head>
+<link rel="stylesheet" th:href="@{/static/admin/css/other/person.css}"/>
+    <style>
+        .user-info-name {
+            padding-top: 18px;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .user-info-account {
+            padding-top: 8px;
+            margin-top: 6px;
+            font-size: 13px;
+            color: #999;
+        }
+
+        .user-info-role {
+            margin-top: 14px;
+        }
+
+        .user-info-role .layui-badge {
+            margin: 0 6px 6px 0;
+        }
+
+        .user-info-meta {
+            margin: 0;
+        }
+
+        .user-info-meta .layui-badge {
+            margin-right: 8px;
+        }
+
+        .user-info-overview-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px dashed #eee;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .user-info-overview-item:last-child {
+            border-bottom: none;
+        }
+
+        .user-info-overview-item .value {
+            color: #333;
+        }
+
+        .user-info-overview-link {
+            cursor: pointer;
+        }
+
+        .user-info-card-header-extra {
+            float: right;
+            font-size: 13px;
+            font-weight: normal;
+            color: #16baaa;
+            cursor: pointer;
+        }
+
+        .user-info-notice-item {
+            padding: 12px 0;
+            border-bottom: 1px dashed #eee;
+            cursor: pointer;
+        }
+
+        .user-info-notice-item:last-child {
+            border-bottom: none;
+        }
+
+        .user-info-notice-item:hover {
+            background-color: #fafafa;
+        }
+
+        .user-info-notice-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .user-info-notice-meta {
+            margin-top: 6px;
+            font-size: 12px;
+            color: #999;
+        }
+    </style>
+<body class="pear-container">
+<div class="layui-row layui-col-space10">
+    <div class="layui-col-md3">
+        <div class="layui-row layui-col-space10">
+            <div class="layui-col-md12">
+                <div class="layui-card">
+                    <div class="layui-card-body" style="padding: 24px 20px 18px;">
+                        <div class="text-center layui-text">
+                            <div class="user-info-head" id="userInfoAvatarWrap" title="点击修改头像">
+                                <img th:src="@{/static/admin/images/avatar.jpg}" id="userInfoAvatar" alt="">
+                            </div>
+                            <div class="user-info-name" id="userInfoName">-</div>
+                            <div class="user-info-account" id="userInfoAccount">-</div>
+                            <div class="user-info-role" id="userInfoRoles"></div>
+                            <div class="user-info-meta">
+                                <span class="layui-badge layui-bg-blue" id="userInfoDept">-</span>
+                                <span class="layui-badge layui-bg-gray" id="userInfoPost">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="layui-col-md12">
+                <div class="layui-card">
+                    <div class="layui-card-header">账号概览</div>
+                    <div class="layui-card-body">
+                        <div class="user-info-overview-item">
+                            <span>账号状态</span>
+                            <span class="value"><span class="layui-badge layui-bg-green" id="userInfoStatus">启用</span></span>
+                        </div>
+                        <div class="user-info-overview-item">
+                            <span>注册时间</span>
+                            <span class="value" id="userInfoCreateTime">-</span>
+                        </div>
+                        <div class="user-info-overview-item">
+                            <span>最近登录</span>
+                            <span class="value" id="userInfoLastLogin">-</span>
+                        </div>
+                        <div class="user-info-overview-item">
+                            <span>未读公告</span>
+                            <span class="value user-info-overview-link" id="userInfoUnreadNotice"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="layui-col-md12">
+                <div class="layui-card">
+                    <div class="layui-card-header">
+                        未读公告
+                        <span class="user-info-card-header-extra" id="userInfoNoticeMore">查看全部</span>
+                    </div>
+                    <div class="layui-card-body" id="userInfoNoticeList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="layui-col-md9">
+        <div class="layui-row layui-col-space10">
+            <div class="layui-col-md6">
+                <div class="layui-card">
+                    <div class="layui-card-header">基本资料</div>
+                    <div class="layui-card-body">
+                        <form class="layui-form" lay-filter="user-info-profile-form" action="">
+                            <div class="layui-form-item">
+                                <label class="layui-form-label">姓名</label>
+                                <div class="layui-input-block">
+                                    <input type="text" name="userName" lay-verify="required" autocomplete="off" placeholder="请输入姓名" class="layui-input">
+                                </div>
+                            </div>
+                            <div class="layui-form-item">
+                                <label class="layui-form-label">性别</label>
+                                <div class="layui-input-block user-sex-radio"></div>
+                            </div>
+                            <div class="layui-form-item">
+                                <label class="layui-form-label">邮箱</label>
+                                <div class="layui-input-block">
+                                    <input type="text" name="userEmail" autocomplete="off" placeholder="请输入邮箱" class="layui-input">
+                                </div>
+                            </div>
+                            <div class="layui-form-item">
+                                <label class="layui-form-label">手机号</label>
+                                <div class="layui-input-block">
+                                    <input type="text" name="userPhone" autocomplete="off" placeholder="请输入手机号" class="layui-input">
+                                </div>
+                            </div>
+                            <div class="layui-form-item">
+                                <div class="layui-input-block">
+                                    <button type="submit" class="pear-btn pear-btn-primary pear-btn-md" lay-submit lay-filter="user-info-profile-save">
+                                        <i class="layui-icon layui-icon-ok"></i>
+                                        保存资料
+                                    </button>
+                                    <button type="reset" class="pear-btn pear-btn-md">
+                                        <i class="layui-icon layui-icon-refresh"></i>
+                                        重置
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="layui-col-md6">
+                <div class="layui-card">
+                    <div class="layui-card-header">修改密码</div>
+                    <div class="layui-card-body">
+                        <form class="layui-form" lay-filter="user-info-password-form" action="">
+                            <div class="layui-form-item">
+                                <label class="layui-form-label">原密码</label>
+                                <div class="layui-input-block">
+                                    <input type="password" name="oldPassword" lay-verify="required" autocomplete="off" placeholder="请输入原密码" class="layui-input">
+                                </div>
+                            </div>
+                            <div class="layui-form-item">
+                                <label class="layui-form-label">新密码</label>
+                                <div class="layui-input-block">
+                                    <input type="password" name="newPassword" lay-verify="required|pass" autocomplete="off" placeholder="8位以上，含字母、数字、特殊字符" class="layui-input">
+                                </div>
+                            </div>
+                            <div class="layui-form-item">
+                                <label class="layui-form-label">确认密码</label>
+                                <div class="layui-input-block">
+                                    <input type="password" name="confirmPassword" lay-verify="required|confirmPass" autocomplete="off" placeholder="请再次输入新密码" class="layui-input">
+                                </div>
+                            </div>
+                            <div class="layui-form-item">
+                                <div class="layui-input-block">
+                                    <button type="submit" class="pear-btn pear-btn-primary pear-btn-md" lay-submit lay-filter="user-info-password-save">
+                                        <i class="layui-icon layui-icon-password"></i>
+                                        修改密码
+                                    </button>
+                                    <button type="reset" class="pear-btn pear-btn-md">
+                                        <i class="layui-icon layui-icon-refresh"></i>
+                                        清空
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="layui-col-md12">
+                <div class="layui-card">
+                    <div class="layui-card-header">最近登录</div>
+                    <div class="layui-card-body" style="padding-top: 0;">
+                        <table id="user-login-table" lay-filter="user-login-table"></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="text/html" id="user-login-status" th:inline="none">
+{{# if(d.current){ }}
+    <span class="layui-badge layui-bg-green">当前</span>
+{{# } else { }}
+    <span class="layui-badge layui-bg-gray">历史</span>
+{{# } }}
+</script>
+
+<script type="text/html" id="user-info-notice-detail" th:inline="none">
+<div style="padding: 16px 20px 8px;">
+    <div class="user-info-notice-detail-meta">
+        <span class="layui-badge layui-bg-blue">{{ d.noticeTypeName || '其他' }}</span>
+        <span class="layui-badge">未读</span>
+    </div>
+    <table class="layui-table" lay-size="sm" style="margin: 0 0 12px;">
+        <colgroup>
+            <col width="96">
+            <col>
+        </colgroup>
+        <tbody>
+        <tr>
+            <td>接收时间</td>
+            <td>{{ d.sendTime || '-' }}</td>
+        </tr>
+        </tbody>
+    </table>
+    <blockquote class="layui-elem-quote" style="margin: 0; line-height: 1.8;">{{ d.noticeContent || '暂无公告内容' }}</blockquote>
+</div>
+</script>
+
+<th:block th:insert="~{include :: footer}"/>
+<script>
+    /* global layui, apiPath, getAjaxErrorMsg */
+    layui.use(['common', 'form', 'jquery', 'layer', 'table', 'laytpl'], function () {
+        let form = layui.form;
+        let $ = layui.jquery;
+        let layer = layui.layer;
+        let table = layui.table;
+        let laytpl = layui.laytpl;
+        let MODULE_PATH = apiPath + '/user/info';
+        let NOTICE_PATH = apiPath + '/user/notice';
+        let profileDetail = null;
+        let unreadNotices = [];
+
+        // 从后台加载性别字典后再拉取页面数据，避免单选渲染时字典尚未就绪。
+        loadDict(DictTypeCode.SYS_USER_SEX).done(function () {
+            loadPageData();
+        });
+
+        function initProfileSexRadio(selectedValue) {
+            renderDictRadio($('.user-sex-radio'), 'userSex', getDictOptions(DictTypeCode.SYS_USER_SEX), {
+                selectedValue: selectedValue
+            });
+            form.render('radio');
+        }
+
+        let loginCols = [
+            [
+                {title: '登录时间', field: 'loginTime', align: 'center'},
+                {title: 'IP 地址', field: 'loginIp', align: 'center'},
+                {title: '浏览器', field: 'browser', align: 'center'},
+                {title: '系统', field: 'systemOs', align: 'center'},
+                {title: '状态', field: 'current', align: 'center', templet: '#user-login-status'}
+            ]
+        ];
+
+        form.verify({
+            pass: function (value) {
+                if (!value || value.length < 8) {
+                    return '密码长度不能少于 8 位';
+                }
+                if (!/[A-Za-z]/.test(value) || !/\d/.test(value) || !/[^A-Za-z0-9]/.test(value)) {
+                    return '密码须同时包含字母、数字和特殊字符';
+                }
+            },
+            confirmPass: function (value) {
+                let newPassword = $('form[lay-filter="user-info-password-form"] [name="newPassword"]').val();
+                if (value !== newPassword) {
+                    return '两次输入的新密码不一致';
+                }
+            }
+        });
+
+        // 渲染个人中心内的最近公告表格。
+        table.render({
+            response: TABLE_RESPONSE,
+            elem: '#user-login-table',
+            id: 'user-login-table',
+            data: [],
+            page: false,
+            skin: 'line',
+            size: 'sm',
+            cols: loginCols,
+            text: {none: '暂无登录记录'}
+        });
+
+        form.on('submit(user-info-profile-save)', function (data) {
+            // 调用后台保存当前登录用户的个人资料。
+            putJson(MODULE_PATH + '/update', data.field, {
+                defaultMsg: '资料保存失败',
+                success: function (result) {
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg || '资料保存成功', {icon: 1, time: 1200}, function () {
+                            loadProfile();
+                        });
+                    } else {
+                        layer.msg(result.msg || '资料保存失败', {icon: 2, time: 1200});
+                    }
+                }
+            });
+            return false;
+        });
+
+        form.on('submit(user-info-password-save)', function (data) {
+            // 调用后台修改当前登录用户密码。
+            patchJson(MODULE_PATH + '/updatePwd', {
+                oldPassword: data.field.oldPassword,
+                newPassword: data.field.newPassword
+            }, {
+                defaultMsg: '密码修改失败',
+                success: function (result) {
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg || '密码修改成功，请重新登录', {icon: 1, time: 1500}, function () {
+                            location.href = apiPath + '/login';
+                        });
+                    } else {
+                        layer.msg(result.msg || '密码修改失败', {icon: 2, time: 1200});
+                    }
+                }
+            });
+            return false;
+        });
+
+        $('#userInfoAvatarWrap').on('click', function () {
+            // 选择本地图片后走公共上传接口，再回写个人头像地址。
+            let input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = function () {
+                if (!input.files || !input.files[0]) {
+                    return;
+                }
+                let formData = new FormData();
+                formData.append('file', input.files[0]);
+                formData.append('fileScene', 'image');
+                formData.append('needLogin', '1');
+                // 头像同名时直接覆盖，避免二次上传被同名校验拦住。
+                formData.append('forceOverwrite', '1');
+                let loading = layer.load();
+                $.ajax({
+                    url: apiPath + '/file/upload',
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function (result) {
+                        if (!isAjaxSuccess(result) || !result.data || !result.data.accessUrl) {
+                            layer.close(loading);
+                            layer.msg((result && result.msg) || '头像上传失败', {icon: 2, time: 1200});
+                            return;
+                        }
+                        patchJson(MODULE_PATH + '/updateAvatar', {userAvatar: result.data.accessUrl}, {
+                            defaultMsg: '头像保存失败',
+                            success: function (saveResult) {
+                                layer.close(loading);
+                                if (isAjaxSuccess(saveResult)) {
+                                    $('#userInfoAvatar').attr('src', apiPath + result.data.accessUrl);
+                                    layer.msg(saveResult.msg || '头像已更新', {icon: 1, time: 1000});
+                                } else {
+                                    layer.msg(saveResult.msg || '头像保存失败', {icon: 2, time: 1200});
+                                }
+                            },
+                            error: function () {
+                                layer.close(loading);
+                            }
+                        });
+                    },
+                    error: function (xhr) {
+                        layer.close(loading);
+                        layer.msg(getAjaxErrorMsg(xhr, '头像上传失败'), {icon: 2, time: 1200});
+                    }
+                });
+            };
+            input.click();
+        });
+
+        $('#userInfoUnreadNotice, #userInfoNoticeMore').on('click', function () {
+            openNoticeList();
+        });
+
+        $('form[lay-filter="user-info-profile-form"]').on('reset', function () {
+            setTimeout(function () {
+                fillProfileForm(profileDetail);
+            });
+        });
+
+        $('#userInfoNoticeList').on('click', '.user-info-notice-item', function () {
+            let noticeId = $(this).attr('data-notice-id');
+            let notice = unreadNotices.find(function (item) {
+                return item.noticeId === noticeId;
+            });
+            if (!notice) {
+                return;
+            }
+            markNoticeRead(notice, function (row) {
+                openNoticeDetail(row);
+            });
+        });
+
+        function loadPageData() {
+            loadProfile();
+            loadLoginLog();
+            loadUnreadNotices();
+        }
+
+        function loadProfile() {
+            // 调用后台加载当前登录用户的资料详情。
+            getJson(MODULE_PATH + '/detail', null, {
+                defaultMsg: '资料加载失败',
+                success: function (result) {
+                    if (!isAjaxSuccess(result) || !result.data) {
+                        layer.msg(result.msg || '资料加载失败', {icon: 2, time: 1200});
+                        return;
+                    }
+                    profileDetail = result.data;
+                    renderSummary(profileDetail);
+                    fillProfileForm(profileDetail);
+                }
+            });
+        }
+
+        function loadLoginLog() {
+            // 调用后台加载当前登录用户的最近登录记录。
+            getJson(MODULE_PATH + '/loginLog', null, {
+                defaultMsg: '登录日志加载失败',
+                success: function (result) {
+                    if (!isAjaxSuccess(result)) {
+                        return;
+                    }
+                    table.reload('user-login-table', {data: result.data || []});
+                }
+            });
+        }
+
+        function loadUnreadNotices() {
+            // 调用后台加载个人中心的未读公告摘要。
+            getJson(NOTICE_PATH + '/list', {page: 1, limit: 5, readState: 0}, {
+                defaultMsg: '公告加载失败',
+                success: function (result) {
+                    if (!isAjaxSuccess(result)) {
+                        renderUnreadCount(0);
+                        renderNoticeList([]);
+                        return;
+                    }
+                    unreadNotices = result.data || [];
+                    renderUnreadCount(result.count || unreadNotices.length);
+                    renderNoticeList(unreadNotices);
+                },
+                error: function () {
+                    renderUnreadCount(0);
+                    renderNoticeList([]);
+                }
+            });
+        }
+
+        function fillProfileForm(profile) {
+            if (!profile) {
+                return;
+            }
+            initProfileSexRadio(profile.userSex != null ? String(profile.userSex) : '');
+            form.val('user-info-profile-form', {
+                userName: profile.userName || '',
+                userEmail: profile.userEmail || '',
+                userPhone: profile.userPhone || ''
+            });
+            form.render();
+        }
+
+        function renderSummary(profile) {
+            $('#userInfoName').text(profile.userName || '-');
+            $('#userInfoAccount').text(profile.userAccount || '-');
+            $('#userInfoDept').text(profile.deptName || '无部门');
+            $('#userInfoPost').text(profile.postName || '无岗位');
+            $('#userInfoCreateTime').text(profile.createTime || '-');
+            $('#userInfoLastLogin').text(profile.lastLoginTime || '-');
+            $('#userInfoStatus').text(profile.isEnabled === 1 ? '启用' : '停用')
+                .removeClass('layui-bg-green layui-bg-gray')
+                .addClass(profile.isEnabled === 1 ? 'layui-bg-green' : 'layui-bg-gray');
+            let avatarUrl = profile.userAvatar
+                ? (profile.userAvatar.indexOf('http') === 0 ? profile.userAvatar : (apiPath + profile.userAvatar))
+                : (apiPath + '/static/admin/images/avatar.jpg');
+            $('#userInfoAvatar').attr('src', avatarUrl);
+
+            let roleHtml = '';
+            (profile.roleNames || []).forEach(function (roleName) {
+                roleHtml += '<span class="layui-badge layui-bg-orange">' + roleName + '</span>';
+            });
+            if (!roleHtml) {
+                roleHtml = '<span class="layui-badge layui-bg-gray">无角色</span>';
+            }
+            $('#userInfoRoles').html(roleHtml);
+        }
+
+        function renderUnreadCount(count) {
+            if (count > 0) {
+                $('#userInfoUnreadNotice').html('<span class="layui-badge">' + count + ' 条</span>');
+            } else {
+                $('#userInfoUnreadNotice').html('<span class="layui-font-gray">0 条</span>');
+            }
+        }
+
+        /** 拼 HTML 前转义公告字段，避免标题以脚本形式执行。 */
+        function escapeHtml(value) {
+            if (value == null || value === '') {
+                return '';
+            }
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function renderNoticeList(notices) {
+            if (!notices || !notices.length) {
+                $('#userInfoNoticeList').html('<div class="layui-font-gray" style="padding: 8px 0;">暂无未读公告</div>');
+                return;
+            }
+            let html = '';
+            notices.forEach(function (item) {
+                html += '<div class="user-info-notice-item" data-notice-id="' + escapeHtml(item.noticeId) + '">'
+                    + '<div class="user-info-notice-title">'
+                    + '<span class="layui-badge-dot"></span>'
+                    + '<span>' + escapeHtml(item.noticeTitle) + '</span>'
+                    + '</div>'
+                    + '<div class="user-info-notice-meta">'
+                    + escapeHtml(item.noticeTypeName || '公告') + ' · ' + escapeHtml(item.sendTime || '-')
+                    + '</div>'
+                    + '</div>';
+            });
+            $('#userInfoNoticeList').html(html);
+        }
+
+        function markNoticeRead(notice, callback) {
+            if (notice.readState !== 0) {
+                callback && callback(notice);
+                return;
+            }
+            // 调用后台将当前公告标记为已读。
+            patchJson(NOTICE_PATH + '/updateRead', {noticeId: notice.noticeId}, {
+                defaultMsg: '标记已读失败',
+                success: function (result) {
+                    if (isAjaxSuccess(result)) {
+                        notice.readState = 1;
+                        refreshNoticeHeader();
+                        loadUnreadNotices();
+                        callback && callback(notice);
+                    } else {
+                        layer.msg(result.msg || '标记已读失败', {icon: 2, time: 1200});
+                    }
+                }
+            });
+        }
+
+        function openNoticeDetail(notice) {
+            let content = laytpl($('#user-info-notice-detail').html()).render(notice);
+            layer.open({
+                type: 1,
+                title: escapeHtml(notice.noticeTitle),
+                area: ['720px', '520px'],
+                shadeClose: true,
+                content: content
+            });
+        }
+
+        function refreshNoticeHeader() {
+            if (window.top && window.top !== window && window.top.refreshNoticeHeader) {
+                window.top.refreshNoticeHeader();
+            }
+        }
+
+        function openNoticeList() {
+            let noticeUrl = NOTICE_PATH;
+            try {
+                if (parent.layui && parent.layui.admin) {
+                    parent.layui.admin.addTab('1220343202867974260', '公告列表', noticeUrl);
+                    return;
+                }
+            } catch (e) {
+                // 非框架内打开时直接跳转公告列表。
+            }
+            window.location.href = noticeUrl;
+        }
+    });
+</script>
+</body>
+</html>

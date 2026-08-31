@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sa="https://www.thymeleaf.org/extras/sa-token">
+<head th:replace="~{include :: header('公告管理')}"></head>
+<body class="pear-container">
+<div class="layui-card">
+    <div class="layui-card-body">
+        <form class="layui-form" action="">
+            <div class="layui-form-item">
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">公告标题</label>
+                    <div class="layui-input-inline">
+                        <input type="text" name="noticeTitle" placeholder="请输入公告标题" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">公告类型</label>
+                    <div class="layui-input-inline">
+                        <select name="noticeType">
+                            <option value="">全部</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">发布状态</label>
+                    <div class="layui-input-inline">
+                        <select name="isSend">
+                            <option value="">全部</option>
+                            <option value="1">已发布</option>
+                            <option value="0">草稿</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <button class="pear-btn pear-btn-md pear-btn-primary" lay-submit lay-filter="notice-query">
+                        <i class="layui-icon layui-icon-search"></i>
+                        查询
+                    </button>
+                    <button type="reset" class="pear-btn pear-btn-md">
+                        <i class="layui-icon layui-icon-refresh"></i>
+                        重置
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="layui-card">
+    <div class="layui-card-body">
+        <table id="notice-table" lay-filter="notice-table"></table>
+    </div>
+</div>
+
+<script type="text/html" id="notice-toolbar">
+    <button sa:hasPermission="system:notice:insert" class="pear-btn pear-btn-primary pear-btn-md" lay-event="add">
+        <i class="layui-icon layui-icon-add-1"></i>
+        新增
+    </button>
+    <button sa:hasPermission="system:notice:delete" class="pear-btn pear-btn-danger pear-btn-md" lay-event="batchRemove">
+        <i class="layui-icon layui-icon-delete"></i>
+        删除
+    </button>
+    <button sa:hasPermission="system:config:notice" type="button" class="pear-btn pear-btn-md" lay-event="noticeConfig">
+        <i class="layui-icon layui-icon-set"></i>
+        公告配置
+    </button>
+</script>
+
+<script type="text/html" id="notice-bar">
+    {{# if(d.isSend == 1){ }}
+    <button sa:hasPermission="system:notice:console" class="pear-btn pear-btn-warming pear-btn-sm" lay-event="console" title="公告控制台"><i class="layui-icon layui-icon-chart"></i></button>
+    {{# } }}
+    <button sa:hasPermission="system:notice:update" class="pear-btn pear-btn-primary pear-btn-sm" lay-event="edit"><i class="layui-icon layui-icon-edit"></i></button>
+    <button sa:hasPermission="system:notice:delete" class="pear-btn pear-btn-danger pear-btn-sm" lay-event="remove"><i class="layui-icon layui-icon-delete"></i></button>
+</script>
+
+<script type="text/html" id="notice-send" th:inline="none">
+{{# if(d.isSend == 1){ }}
+    <input type="checkbox" lay-skin="switch" lay-text="发布|草稿" checked disabled />
+{{# } else { }}
+    <input sa:hasPermission="system:notice:updateEnabled" type="checkbox" name="isSend" value="{{d.noticeId}}" lay-skin="switch" lay-text="发布|草稿" lay-filter="notice-send" />
+{{# } }}
+</script>
+
+<script type="text/html" id="notice-form">
+    <form class="layui-form" lay-filter="notice-form" action="">
+        <div class="mainBox">
+            <div class="main-container">
+                <input type="hidden" name="noticeId">
+                <div class="layui-form-item">
+                    <label class="layui-form-label">公告标题</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="noticeTitle" lay-verify="required" placeholder="请输入公告标题" autocomplete="off" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">公告类型</label>
+                    <div class="layui-input-block notice-type-radio"></div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">接收者</label>
+                    <div class="layui-input-block">
+                        <input type="hidden" name="receiverIds">
+                        <div class="notice-receiver-type-radio"></div>
+                    </div>
+                </div>
+                <div class="layui-form-item notice-receiver-target notice-receiver-role" style="display:none;">
+                    <label class="layui-form-label">选择角色</label>
+                    <div class="layui-input-block">
+                        <select xm-select="noticeRoleSelect">
+                            <option th:each="r : ${roleList}" th:value="${r.roleId}" th:text="${r.roleName}"></option>
+                        </select>
+                    </div>
+                </div>
+                <div class="layui-form-item notice-receiver-target notice-receiver-dept" style="display:none;">
+                    <label class="layui-form-label">选择部门</label>
+                    <div class="layui-input-block">
+                        <div id="notice-dept-tree" style="max-height:240px;overflow:auto;border:1px solid #eee;padding:8px;border-radius:4px;"></div>
+                    </div>
+                </div>
+                <div class="layui-form-item notice-receiver-target notice-receiver-user" style="display:none;">
+                    <label class="layui-form-label">选择用户</label>
+                    <div class="layui-input-block">
+                        <select xm-select="noticeUserSelect" xm-select-radio xm-select-search xm-select-search-type="dl">
+                        </select>
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">排序</label>
+                    <div class="layui-input-block">
+                        <input type="number" name="orderNum" lay-verify="required|number" placeholder="请输入排序号" autocomplete="off" class="layui-input" value="0">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">状态</label>
+                    <div class="layui-input-block">
+                        <input type="radio" name="isSend" value="1" title="发布">
+                        <input type="radio" name="isSend" value="0" title="草稿" checked>
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">过期时间</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="expireTime" id="notice-expire-time" placeholder="请选择过期时间" autocomplete="off" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item layui-form-text">
+                    <label class="layui-form-label">公告内容</label>
+                    <div class="layui-input-block">
+                        <textarea name="noticeContent" lay-verify="required" placeholder="请输入公告内容" class="layui-textarea" style="min-height: 160px;"></textarea>
+                    </div>
+                </div>
+                <div class="layui-form-item layui-form-text">
+                    <label class="layui-form-label">公告说明</label>
+                    <div class="layui-input-block">
+                        <textarea name="noticeDesc" placeholder="请输入公告说明" class="layui-textarea"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="bottom">
+            <div class="button-container">
+                <button sa:hasPermissionOr="system:notice:insert,system:notice:update" type="submit" class="pear-btn pear-btn-primary pear-btn-sm" lay-submit lay-filter="notice-save">
+                    <i class="layui-icon layui-icon-ok"></i>
+                    提交
+                </button>
+                <button type="button" class="pear-btn pear-btn-sm" onclick="closeCurrentLayer()">
+                    <i class="layui-icon layui-icon-close"></i>
+                    关闭
+                </button>
+            </div>
+        </div>
+    </form>
+</script>
+
+<div id="notice-config-modal" style="display:none;">
+    <form class="layui-form" lay-filter="notice-config-form" action="">
+        <div class="mainBox">
+            <div class="main-container" id="notice-config-fields"></div>
+        </div>
+        <div class="bottom">
+            <div class="button-container">
+                <button type="submit" class="pear-btn pear-btn-primary pear-btn-sm" lay-submit=""
+                        lay-filter="notice-config-save">
+                    <i class="layui-icon layui-icon-ok"></i>
+                    提交
+                </button>
+                <button type="button" class="pear-btn pear-btn-sm" id="btn-notice-config-close">
+                    <i class="layui-icon layui-icon-close"></i>
+                    关闭
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script th:inline="javascript">
+    window.noticeDeptList = /*[[${deptList}]]*/ [];
+</script>
+<th:block th:insert="~{include :: footer}"/>
+<script>
+    layui.use(['common', 'table', 'form', 'jquery', 'layer', 'laydate', 'select', 'tree'], function () {
+        let table = layui.table;
+        let form = layui.form;
+        let $ = layui.jquery;
+        let layer = layui.layer;
+        let laydate = layui.laydate;
+        let formSelects = layui.select;
+        let tree = layui.tree;
+        let MODULE_PATH = apiPath + "/notice";
+        let CONFIG_PATH = apiPath + '/config';
+        let NOTICE_DEPT_TREE_ID = 'notice-dept-tree';
+        let noticeConfigLayerIndex = null;
+
+        // 从后台加载公告类型与接收对象字典，供查询与表单渲染。
+        loadDict([DictTypeCode.SYS_NOTICE_TYPE, DictTypeCode.SYS_NOTICE_RECEIVER_TYPE]).done(function () {
+            fillDictQuerySelect($('select[name="noticeType"]'), DictTypeCode.SYS_NOTICE_TYPE);
+            form.render('select');
+        });
+
+        function initNoticeDictFields(layero, row) {
+            renderDictRadio(layero.find('.notice-type-radio'), 'noticeType', getDictOptions(DictTypeCode.SYS_NOTICE_TYPE), {
+                selectedValue: row ? row.noticeType : ''
+            });
+            renderDictRadio(layero.find('.notice-receiver-type-radio'), 'receiverType', getDictOptions(DictTypeCode.SYS_NOTICE_RECEIVER_TYPE), {
+                selectedValue: row ? row.receiverType : '1',
+                defaultValue: '1',
+                filter: 'notice-receiver-type'
+            });
+            form.render('radio');
+        }
+
+        let cols = [
+            [
+                {type: 'checkbox'},
+                {title: '公告标题', field: 'noticeTitle', align: 'center'},
+                {title: '公告类型', field: 'noticeTypeName', align: 'center'},
+                {title: '排序', field: 'orderNum', align: 'center'},
+                {title: '发布状态', field: 'isSend', align: 'center', templet: '#notice-send', minWidth: 110},
+                {title: '发布时间', field: 'sendTime', align: 'center'},
+                {title: '过期时间', field: 'expireTime', align: 'center'},
+                {title: '操作', toolbar: '#notice-bar', align: 'center', width: 160}
+            ]
+        ];
+
+        // 从后台分页加载公告列表。
+        table.render({
+            response: TABLE_RESPONSE,
+            elem: '#notice-table',
+            url: MODULE_PATH + '/list',
+            page: true,
+            cols: cols,
+            skin: 'line',
+            toolbar: '#notice-toolbar',
+            defaultToolbar: [{
+                title: '刷新',
+                layEvent: 'refresh',
+                icon: 'layui-icon-refresh'
+            }, 'filter', 'print', 'exports'],
+            done: function () {
+                form.render('checkbox');
+            }
+        });
+
+        table.on('tool(notice-table)', function (obj) {
+            if (obj.event === 'remove') {
+                window.remove(obj);
+            } else if (obj.event === 'edit') {
+                window.edit(obj);
+            } else if (obj.event === 'console') {
+                window.openConsole(obj);
+            }
+        });
+
+        table.on('toolbar(notice-table)', function (obj) {
+            if (obj.event === 'add') {
+                window.add();
+            } else if (obj.event === 'refresh') {
+                window.refresh();
+            } else if (obj.event === 'batchRemove') {
+                window.batchRemove(obj);
+            } else if (obj.event === 'noticeConfig') {
+                openNoticeConfig();
+            }
+        });
+
+        form.on('submit(notice-query)', function (data) {
+            table.reload('notice-table', {where: data.field});
+            return false;
+        });
+
+        form.on('switch(notice-send)', function (obj) {
+            // 列表开关只允许草稿发布，不允许改回草稿。
+            let isSend = obj.elem.checked ? 1 : 0;
+            if (isSend === 0) {
+                obj.elem.checked = false;
+                form.render('checkbox');
+                return;
+            }
+            // 调用后台切换公告发布状态。
+            patchJson(MODULE_PATH + '/updateEnabled', {
+                noticeId: this.value,
+                isSend: isSend
+            }, {
+                defaultMsg: '状态更新失败',
+                success: function (result) {
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg, {icon: 1, time: 1000});
+                        table.reload('notice-table');
+                    } else {
+                        obj.elem.checked = !obj.elem.checked;
+                        form.render('checkbox');
+                        layer.msg(result.msg || '状态更新失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    obj.elem.checked = !obj.elem.checked;
+                    form.render('checkbox');
+                }
+            });
+        });
+
+        function normalizeNoticeForm(field, $form) {
+            field.noticeType = Number(field.noticeType);
+            field.receiverType = Number(field.receiverType);
+            field.isSend = Number(field.isSend);
+            field.orderNum = Number(field.orderNum);
+            field.expireTime = field.expireTime || null;
+            field.receiverIds = collectReceiverIds($form, field.receiverType);
+            delete field.noticeUserId;
+            return field;
+        }
+
+        function collectReceiverIds($form, receiverType) {
+            if (receiverType === 1) {
+                return null;
+            }
+            if (receiverType === 2) {
+                let roleIds = formSelects.value('noticeRoleSelect', 'val');
+                return roleIds && roleIds.length ? roleIds.join(',') : '';
+            }
+            if (receiverType === 3) {
+                return collectNoticeDeptCheckedIds().join(',');
+            }
+            if (receiverType === 4) {
+                let userIds = formSelects.value('noticeUserSelect', 'val');
+                return userIds && userIds.length ? userIds[0] : '';
+            }
+            return '';
+        }
+
+        function buildNoticeDeptTreeData(list, parentId) {
+            if (!list || !list.length) {
+                return [];
+            }
+            return list.filter(function (item) {
+                return String(item.parentId) === String(parentId);
+            }).map(function (item) {
+                return {
+                    id: item.deptId,
+                    title: item.deptName,
+                    children: buildNoticeDeptTreeData(list, item.deptId)
+                };
+            });
+        }
+
+        function renderNoticeDeptTree(layero, checkedIds) {
+            let $treeElem = layero.find('#notice-dept-tree');
+            if ($treeElem.length === 0 || !window.noticeDeptList || !window.noticeDeptList.length) {
+                return;
+            }
+            tree.render({
+                elem: $treeElem[0],
+                id: NOTICE_DEPT_TREE_ID,
+                data: buildNoticeDeptTreeData(window.noticeDeptList, '0'),
+                showCheckbox: true,
+                showLine: true
+            });
+            if (checkedIds && checkedIds.length) {
+                setTimeout(function () {
+                    tree.setChecked(NOTICE_DEPT_TREE_ID, checkedIds);
+                }, 0);
+            }
+        }
+
+        function collectNoticeDeptCheckedIds() {
+            let checked = tree.getChecked(NOTICE_DEPT_TREE_ID);
+            let ids = [];
+            function walk(nodes) {
+                if (!nodes || !nodes.length) {
+                    return;
+                }
+                nodes.forEach(function (node) {
+                    if (node.id) {
+                        ids.push(String(node.id));
+                    }
+                    if (node.children && node.children.length) {
+                        walk(node.children);
+                    }
+                });
+            }
+            walk(checked);
+            return ids;
+        }
+
+        function initNoticeRoleSelect(layero, roleIds) {
+            let $sel = layero.find('select[xm-select="noticeRoleSelect"]');
+            if ($sel.length === 0) {
+                return;
+            }
+            formSelects.render('noticeRoleSelect');
+            if (roleIds) {
+                formSelects.value('noticeRoleSelect', roleIds.split(','));
+            }
+        }
+
+        function toggleReceiverTarget(layero, receiverType) {
+            layero.find('.notice-receiver-target').hide();
+            if (receiverType === 2) {
+                layero.find('.notice-receiver-role').show();
+            } else if (receiverType === 3) {
+                layero.find('.notice-receiver-dept').show();
+            } else if (receiverType === 4) {
+                layero.find('.notice-receiver-user').show();
+            }
+        }
+
+        function initNoticeUserSelect(layero, userId) {
+            if (layero.find('select[xm-select="noticeUserSelect"]').length === 0) {
+                return;
+            }
+            let pendingUserId = userId ? String(userId) : '';
+            formSelects.config('noticeUserSelect', {
+                // 远程搜索接收公告的用户。
+                searchUrl: MODULE_PATH + '/searchUser',
+                header: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                response: {statusCode: 200, statusName: 'code', msgName: 'msg', dataName: 'data'},
+                searchName: 'keyword',
+                beforeSuccess: function (id, searchUrl, inputValue, res) {
+                    if (res.data && res.data.length) {
+                        res.data = res.data.map(function (user) {
+                            return {name: user.label, value: user.userId};
+                        });
+                    }
+                    return res;
+                },
+                success: function (id, searchUrl, inputValue) {
+                    // 指定用户编辑回显必须等远程选项渲染完成后再选中。
+                    if (pendingUserId && String(inputValue) === pendingUserId) {
+                        formSelects.value('noticeUserSelect', [pendingUserId]);
+                        pendingUserId = '';
+                    }
+                }
+            });
+            formSelects.render('noticeUserSelect');
+            if (userId) {
+                formSelects.search('noticeUserSelect', userId);
+            }
+        }
+
+        function validateReceiverBeforeSave($form, receiverType) {
+            if (receiverType === 1) {
+                return true;
+            }
+            let receiverIds = collectReceiverIds($form, receiverType);
+            if (!receiverIds) {
+                let msg = receiverType === 2 ? '请选择角色' : (receiverType === 3 ? '请选择部门' : '请选择用户');
+                layer.msg(msg, {icon: 3, time: 1000});
+                return false;
+            }
+            return true;
+        }
+
+        function saveNotice(data) {
+            let $form = $('form[lay-filter="notice-form"]');
+            if (!validateReceiverBeforeSave($form, Number(data.field.receiverType))) {
+                return;
+            }
+            let loading = layer.load();
+            // 按表单是否带公告 ID 决定新增或修改公告。
+            (data.field.noticeId ? putJson : postJson)(MODULE_PATH + (data.field.noticeId ? '/update' : '/add'), normalizeNoticeForm(data.field, $form), {
+                defaultMsg: '操作失败',
+                success: function (result) {
+                    layer.close(loading);
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                            layer.closeAll('page');
+                            table.reload('notice-table');
+                        });
+                    } else {
+                        layer.msg(result.msg || '操作失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    layer.close(loading);
+                }
+            });
+        }
+
+        form.on('submit(notice-save)', function (data) {
+            saveNotice(data);
+            return false;
+        });
+
+        form.on('radio(notice-receiver-type)', function (obj) {
+            let $form = $(obj.elem).closest('form[lay-filter="notice-form"]');
+            let layero = $form.closest('.layui-layer-content');
+            if (layero.length === 0) {
+                layero = $form.parent();
+            }
+            let receiverType = Number(obj.value);
+            toggleReceiverTarget(layero, receiverType);
+            if (receiverType === 2) {
+                initNoticeRoleSelect(layero, '');
+            } else if (receiverType === 3) {
+                renderNoticeDeptTree(layero, []);
+            } else if (receiverType === 4) {
+                initNoticeUserSelect(layero, '');
+            }
+        });
+
+        function setNoticeFormReadonly(readonly) {
+            let $form = $('form[lay-filter="notice-form"]');
+            $form.find('input:not([type="hidden"]), select, textarea').each(function () {
+                $(this).prop('disabled', readonly).prop('readonly', readonly);
+            });
+            $form.find('button[lay-filter="notice-save"]').toggle(!readonly);
+            if (readonly) {
+                formSelects.disabled('noticeUserSelect');
+            } else {
+                formSelects.undisabled('noticeUserSelect');
+            }
+            form.render(null, 'notice-form');
+        }
+
+        function openNoticeForm(mode, row) {
+            let isView = mode === 'edit' && row && row.isSend === 1;
+            let title = mode === 'add' ? '新增公告' : (isView ? '查看公告' : '修改公告');
+            layer.open({
+                type: 1,
+                title: title,
+                offset: mode === 'add' ? 'b' : 'r',
+                anim: mode === 'add' ? 'slideUp' : 'slideLeft',
+                shade: 0.1,
+                shadeClose: true,
+                id: mode === 'add' ? 'notice-add-layer' : 'notice-edit-layer',
+                area: mode === 'add' ? ['800px', '80%'] : ['640px', '100%'],
+                content: $('#notice-form').html(),
+                success: function (layero) {
+                    initNoticeDictFields(layero, mode === 'edit' ? row : null);
+                    if (!isView) {
+                        laydate.render({
+                            elem: layero.find('#notice-expire-time')[0],
+                            type: 'datetime',
+                            format: 'yyyy-MM-dd HH:mm:ss'
+                        });
+                    }
+                    form.render(null, 'notice-form');
+                    let receiverType = 1;
+                    let receiverIds = '';
+                    if (mode === 'edit' && row) {
+                        receiverType = Number(row.receiverType || 1);
+                        receiverIds = row.receiverIds || '';
+                        form.val('notice-form', {
+                            noticeId: row.noticeId,
+                            noticeTitle: row.noticeTitle,
+                            noticeContent: row.noticeContent,
+                            noticeType: String(row.noticeType),
+                            receiverType: String(receiverType),
+                            receiverIds: receiverIds,
+                            noticeDesc: row.noticeDesc,
+                            isSend: String(row.isSend),
+                            orderNum: row.orderNum,
+                            expireTime: row.expireTime
+                        });
+                        if (isView) {
+                            setNoticeFormReadonly(true);
+                        } else if (row.delivered) {
+                            layero.find('input[name="isSend"][value="0"]').prop('disabled', true);
+                            form.render('radio');
+                        }
+                    } else {
+                        form.val('notice-form', {
+                            noticeId: '',
+                            noticeTitle: '',
+                            noticeContent: '',
+                            noticeDesc: '',
+                            isSend: '0',
+                            orderNum: 0,
+                            expireTime: ''
+                        });
+                    }
+                    toggleReceiverTarget(layero, receiverType);
+                    if (receiverType === 2) {
+                        initNoticeRoleSelect(layero, receiverIds);
+                    } else if (receiverType === 3) {
+                        renderNoticeDeptTree(layero, receiverIds ? receiverIds.split(',') : []);
+                    } else if (receiverType === 4) {
+                        initNoticeUserSelect(layero, receiverIds);
+                    }
+                }
+            });
+        }
+
+        window.add = function () {
+            openNoticeForm('add', null);
+        };
+
+        window.closeCurrentLayer = function () {
+            layer.close(layer.index);
+        };
+
+        window.edit = function (obj) {
+            openNoticeForm('edit', obj.data);
+        };
+
+        /** 已发布公告：宽抽屉打开独立控制台页。 */
+        window.openConsole = function (obj) {
+            if (!obj.data || obj.data.isSend !== 1) {
+                layer.msg('仅已发布公告可查看控制台', {icon: 0, time: 1200});
+                return;
+            }
+            let titleName = obj.data.noticeTitle || '';
+            layer.open({
+                type: 2,
+                title: '公告控制台' + (titleName ? '（' + escapeHtml(titleName) + '）' : ''),
+                offset: 'r',
+                anim: 'slideLeft',
+                shade: 0.1,
+                shadeClose: true,
+                area: ['70%', '100%'],
+                id: 'notice-console-layer',
+                content: MODULE_PATH + '/consoleView?noticeId=' + encodeURIComponent(obj.data.noticeId)
+            });
+        };
+
+        window.remove = function (obj) {
+            layer.confirm('确定要删除该公告', {
+                icon: 3,
+                title: '提示'
+            }, function (index) {
+                layer.close(index);
+                let loading = layer.load();
+                // 调用后台删除当前公告。
+                deleteJson(MODULE_PATH + '/delete', {ids: obj.data.noticeId}, {
+                    defaultMsg: '删除失败',
+                    success: function (result) {
+                        layer.close(loading);
+                        if (isAjaxSuccess(result)) {
+                            layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                                obj.del();
+                            });
+                        } else {
+                            layer.msg(result.msg || '删除失败', {icon: 2, time: 1000});
+                        }
+                    },
+                    error: function () {
+                        layer.close(loading);
+                    }
+                });
+            });
+        };
+
+        window.batchRemove = function (obj) {
+            let checkIds = getCheckedFieldIds(obj, 'noticeId');
+            if (checkIds === '') {
+                layer.msg('未选中数据', {icon: 3, time: 1000});
+                return false;
+            }
+            layer.confirm('确定要删除这些公告', {
+                icon: 3,
+                title: '提示'
+            }, function (index) {
+                layer.close(index);
+                let loading = layer.load();
+                // 调用后台批量删除选中的公告。
+                deleteJson(MODULE_PATH + '/delete', {ids: checkIds}, {
+                    defaultMsg: '删除失败',
+                    success: function (result) {
+                        layer.close(loading);
+                        if (isAjaxSuccess(result)) {
+                            layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                                table.reload('notice-table');
+                            });
+                        } else {
+                            layer.msg(result.msg || '删除失败', {icon: 2, time: 1000});
+                        }
+                    },
+                    error: function () {
+                        layer.close(loading);
+                    }
+                });
+            });
+        };
+
+        window.refresh = function () {
+            table.reload('notice-table');
+        };
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function buildNoticeConfigField(item) {
+            let value = escapeHtml(item.configValue || '');
+            let code = escapeHtml(item.configCode);
+            let id = escapeHtml(item.configId);
+            let name = escapeHtml(item.configName);
+            let inputType = item.valueType === 'number' ? 'number' : 'text';
+            // 与任务配置一致：长标签 + 官方 input-inline。
+            let attrs = ' min="0" step="1"';
+            return '<div class="layui-form-item" data-config-id="' + id + '" data-config-code="' + code
+                + '" data-value-type="' + escapeHtml(item.valueType) + '">'
+                + '<label class="layui-form-label" style="width: 120px; white-space: nowrap;">' + name + '</label>'
+                + '<div class="layui-input-inline">'
+                + '<input type="' + inputType + '" maxlength="1000" value="' + value + '" class="layui-input"' + attrs + '>'
+                + '</div></div>';
+        }
+
+        function closeNoticeConfigLayer() {
+            if (noticeConfigLayerIndex != null) {
+                layer.close(noticeConfigLayerIndex);
+                noticeConfigLayerIndex = null;
+            }
+        }
+
+        function openNoticeConfig() {
+            // 加载 notice 分组配置；左侧短抽屉与任务配置/日志配置同风格。
+            getJson(CONFIG_PATH + '/group', {configGroup: 'notice'}, {
+                defaultMsg: '加载公告配置失败',
+                success: function (result) {
+                    if (!isAjaxSuccess(result)) {
+                        layer.msg(result.msg || '加载公告配置失败', {icon: 2, time: 1000});
+                        return;
+                    }
+                    let configs = result.data || [];
+                    let html = [];
+                    if (!configs.length) {
+                        html.push('<div class="layui-form-item"><div class="layui-input-block">暂无可维护配置</div></div>');
+                    }
+                    configs.forEach(function (item) {
+                        html.push(buildNoticeConfigField(item));
+                    });
+                    $('#notice-config-fields').html(html.join(''));
+                    layer.open({
+                        type: 1,
+                        title: '公告配置',
+                        offset: 'l',
+                        anim: 'slideRight',
+                        // 两项短字段，与任务配置抽屉同口径。
+                        area: ['420px', '36%'],
+                        shade: 0.1,
+                        shadeClose: true,
+                        id: 'notice-config-layer',
+                        content: $('#notice-config-modal'),
+                        success: function (layero, index) {
+                            noticeConfigLayerIndex = index;
+                            form.render(null, 'notice-config-form');
+                            $('#btn-notice-config-close').off('click').on('click', closeNoticeConfigLayer);
+                        }
+                    });
+                }
+            });
+        }
+
+        form.on('submit(notice-config-save)', function () {
+            let configs = [];
+            let invalidMsg = '';
+            $('[lay-filter="notice-config-form"] .layui-form-item[data-config-id]').each(function () {
+                let $item = $(this);
+                let configValue = $item.find('input,textarea,select').val();
+                let days = Number(configValue);
+                if (!Number.isInteger(days) || days < 0) {
+                    invalidMsg = '保留天数须为不小于 0 的整数';
+                    return false;
+                }
+                configs.push({
+                    configId: $item.attr('data-config-id'),
+                    configCode: $item.attr('data-config-code'),
+                    configValue: String(days)
+                });
+            });
+            if (invalidMsg) {
+                layer.msg(invalidMsg, {icon: 2, time: 1200});
+                return false;
+            }
+            let loading = layer.load();
+            // 保存公告收件箱保留天数配置。
+            putJson(CONFIG_PATH + '/updateGroup', {configGroup: 'notice', configs: configs}, {
+                defaultMsg: '保存公告配置失败',
+                success: function (result) {
+                    layer.close(loading);
+                    if (isAjaxSuccess(result)) {
+                        closeNoticeConfigLayer();
+                        layer.msg(result.msg, {icon: 1, time: 1000});
+                    } else {
+                        layer.msg(result.msg || '保存公告配置失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    layer.close(loading);
+                }
+            });
+            return false;
+        });
+    });
+</script>
+</body>
+</html>

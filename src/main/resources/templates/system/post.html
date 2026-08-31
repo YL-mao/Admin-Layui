@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sa="https://www.thymeleaf.org/extras/sa-token">
+<head th:replace="~{include :: header('岗位管理')}"></head>
+<body class="pear-container">
+<div class="layui-card">
+    <div class="layui-card-body">
+        <form class="layui-form" action="">
+            <div class="layui-form-item">
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">岗位名称</label>
+                    <div class="layui-input-inline">
+                        <input type="text" name="postName" maxlength="30" placeholder="请输入岗位名称" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">岗位编码</label>
+                    <div class="layui-input-inline">
+                        <input type="text" name="postCode" maxlength="64" placeholder="请输入岗位编码" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <button class="pear-btn pear-btn-md pear-btn-primary" lay-submit lay-filter="position-query">
+                        <i class="layui-icon layui-icon-search"></i>
+                        查询
+                    </button>
+                    <button type="reset" class="pear-btn pear-btn-md">
+                        <i class="layui-icon layui-icon-refresh"></i>
+                        重置
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="layui-card">
+    <div class="layui-card-body">
+        <table id="position-table" lay-filter="position-table"></table>
+    </div>
+</div>
+
+<script type="text/html" id="position-toolbar">
+    <button sa:hasPermission="system:post:insert" class="pear-btn pear-btn-primary pear-btn-md" lay-event="add">
+        <i class="layui-icon layui-icon-add-1"></i>
+        新增
+    </button>
+    <button sa:hasPermission="system:post:delete" class="pear-btn pear-btn-danger pear-btn-md" lay-event="batchRemove">
+        <i class="layui-icon layui-icon-delete"></i>
+        删除
+    </button>
+</script>
+
+<script type="text/html" id="position-bar">
+    <button sa:hasPermission="system:post:update" class="pear-btn pear-btn-primary pear-btn-sm" lay-event="edit"><i class="layui-icon layui-icon-edit"></i></button>
+    <button sa:hasPermission="system:post:delete" class="pear-btn pear-btn-danger pear-btn-sm" lay-event="remove"><i class="layui-icon layui-icon-delete"></i></button>
+</script>
+
+<script type="text/html" id="position-status" th:inline="none">
+{{# if(d.isEnabled == 1){ }}
+    <input sa:hasPermission="system:post:updateEnabled" type="checkbox" name="isEnabled" value="{{d.postId}}" lay-skin="switch" lay-text="启用|停用" lay-filter="position-status" checked />
+{{# } else { }}
+    <input sa:hasPermission="system:post:updateEnabled" type="checkbox" name="isEnabled" value="{{d.postId}}" lay-skin="switch" lay-text="启用|停用" lay-filter="position-status" />
+{{# } }}
+</script>
+
+<script type="text/html" id="position-type">
+    {{ d.postTypeName || '' }}
+</script>
+
+<script type="text/html" id="position-form">
+    <form class="layui-form" lay-filter="position-form" action="">
+        <div class="mainBox">
+            <div class="main-container">
+        <input type="hidden" name="postId">
+        <div class="layui-form-item">
+            <label class="layui-form-label">岗位名称</label>
+            <div class="layui-input-block">
+                <input type="text" name="postName" lay-verify="required" maxlength="30" placeholder="请输入岗位名称" autocomplete="off"
+                       class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">岗位编码</label>
+            <div class="layui-input-block">
+                <input type="text" name="postCode" lay-verify="required|codeFormat" maxlength="64" placeholder="请输入岗位编码" autocomplete="off"
+                       class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">岗位类型</label>
+            <div class="layui-input-block">
+                <select name="postType" lay-verify="required"></select>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">排序</label>
+            <div class="layui-input-block">
+                <input type="number" name="orderNum" lay-verify="required|number" placeholder="请输入排序号"
+                       autocomplete="off" class="layui-input" value="1">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">状态</label>
+            <div class="layui-input-block">
+                <input type="radio" name="isEnabled" value="1" title="启用">
+                <input type="radio" name="isEnabled" value="0" title="停用" checked>
+            </div>
+        </div>
+            </div>
+        </div>
+        <div class="bottom">
+            <div class="button-container">
+                <button sa:hasPermissionOr="system:post:insert,system:post:update" type="submit" class="pear-btn pear-btn-primary pear-btn-sm" lay-submit lay-filter="position-save">
+                    <i class="layui-icon layui-icon-ok"></i>
+                    提交
+                </button>
+                <button type="reset" class="pear-btn pear-btn-sm">
+                    <i class="layui-icon layui-icon-refresh"></i>
+                    重置
+                </button>
+            </div>
+        </div>
+    </form>
+</script>
+
+<th:block th:insert="~{include :: footer}"/>
+<script>
+    layui.use(['common', 'table', 'form', 'jquery'], function () {
+        let table = layui.table;
+        let form = layui.form;
+        let $ = layui.jquery;
+        let MODULE_PATH = apiPath + "/post";
+        let formMode = 'add';
+
+        // 从后台加载岗位类型字典，供表单下拉渲染。
+        loadDict(DictTypeCode.SYS_POST_TYPE).done(function () {
+            form.render('select');
+        });
+
+        function initPostTypeSelect(layero, selectedValue) {
+            renderDictSelect(layero.find('[name="postType"]'), getDictOptions(DictTypeCode.SYS_POST_TYPE), {
+                emptyOption: false,
+                selectedValue: selectedValue
+            });
+            form.render('select');
+        }
+
+        form.verify({
+            codeFormat: function (value) {
+                // 普通编码只允许字母、数字、下划线和中划线。
+                if (value && !/^[A-Za-z0-9_-]+$/.test(value)) {
+                    return '编码只能包含字母、数字、下划线和中划线';
+                }
+            }
+        });
+
+        let cols = [
+            [
+                {type: 'checkbox'},
+                {title: '岗位名称', field: 'postName', align: 'center'},
+                {title: '岗位编码', field: 'postCode', align: 'center'},
+                {title: '岗位类型', field: 'postTypeName', align: 'center'},
+                {title: '排序', field: 'orderNum', align: 'center'},
+                {title: '状态', field: 'isEnabled', align: 'center', templet: '#position-status'},
+                {title: '操作', toolbar: '#position-bar', align: 'center'}
+            ]
+        ];
+
+        // 从后台分页加载岗位列表。
+        table.render({
+            response: TABLE_RESPONSE,
+            elem: '#position-table',
+            url: MODULE_PATH + '/list',
+            page: true,
+            cols: cols,
+            skin: 'line',
+            toolbar: '#position-toolbar',
+            defaultToolbar: [{
+                title: '刷新',
+                layEvent: 'refresh',
+                icon: 'layui-icon-refresh',
+            }, 'filter', 'print', 'exports']
+        });
+
+        table.on('tool(position-table)', function (obj) {
+            if (obj.event === 'remove') {
+                window.remove(obj);
+            } else if (obj.event === 'edit') {
+                window.edit(obj);
+            }
+        });
+
+        table.on('toolbar(position-table)', function (obj) {
+            if (obj.event === 'add') {
+                window.add();
+            } else if (obj.event === 'refresh') {
+                window.refresh();
+            } else if (obj.event === 'batchRemove') {
+                window.batchRemove(obj);
+            }
+        });
+
+        form.on('submit(position-query)', function (data) {
+            table.reload('position-table', {where: data.field});
+            return false;
+        });
+
+        form.on('switch(position-status)', function (obj) {
+            // isEnabled 使用布尔语义，1 表示启用，0 表示停用。
+            let isEnabled = obj.elem.checked ? 1 : 0;
+            // 调用后台切换岗位启停状态。
+            patchJson(MODULE_PATH + '/updateEnabled', {
+                postId: this.value,
+                isEnabled: isEnabled
+            }, {
+                defaultMsg: '状态更新失败',
+                success: function (result) {
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg, {icon: 1, time: 1000});
+                    } else {
+                        obj.elem.checked = !obj.elem.checked;
+                        form.render('checkbox');
+                        layer.msg(result.msg || '状态更新失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    obj.elem.checked = !obj.elem.checked;
+                    form.render('checkbox');
+                }
+            });
+        });
+
+        function checkPostCodeUnique(postCode, callback) {
+            // 调用后台校验岗位编码是否已存在。
+            checkUnique(MODULE_PATH + '/checkCode', {postCode: postCode}, callback);
+        }
+
+        function checkPostNameUnique(postName, callback) {
+            // 调用后台校验岗位名称是否已存在。
+            checkUnique(MODULE_PATH + '/checkName', {postName: postName}, callback);
+        }
+
+        function savePosition(data) {
+            let url = formMode === 'add' ? MODULE_PATH + '/add' : MODULE_PATH + '/update';
+            let loading = layer.load();
+            // 按表单模式调用后台新增或修改岗位。
+            (formMode === 'add' ? postJson : putJson)(url, data.field, {
+                defaultMsg: '操作失败',
+                success: function (result) {
+                    layer.close(loading);
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                            layer.closeAll('page');
+                            table.reload('position-table');
+                        });
+                    } else {
+                        layer.msg(result.msg || '操作失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    layer.close(loading);
+                }
+            });
+        }
+
+        form.on('submit(position-save)', function (data) {
+            let originalPostCode = $(data.form).find('[name="postCode"]').attr('data-original-post-code');
+            let originalPostName = $(data.form).find('[name="postName"]').attr('data-original-post-name');
+            let codeUnchanged = data.field.postId && originalPostCode === data.field.postCode;
+            let nameUnchanged = data.field.postId && originalPostName === data.field.postName;
+
+            function checkNameAndSave() {
+                if (nameUnchanged) {
+                    savePosition(data);
+                    return;
+                }
+                checkPostNameUnique(data.field.postName, function (unique) {
+                    if (unique) {
+                        savePosition(data);
+                    } else {
+                        layer.msg('岗位名称已存在', {icon: 2, time: 1000});
+                    }
+                });
+            }
+
+            if (codeUnchanged) {
+                checkNameAndSave();
+                return false;
+            }
+            checkPostCodeUnique(data.field.postCode, function (unique) {
+                if (unique) {
+                    checkNameAndSave();
+                } else {
+                    layer.msg('岗位编码已存在', {icon: 2, time: 1000});
+                }
+            });
+            return false;
+        });
+
+        function openPositionForm(mode, row) {
+            formMode = mode;
+            layer.open({
+                type: 1,
+                title: mode === 'add' ? '新增岗位' : '修改岗位',
+                offset: mode === 'add' ? 'b' : 'r',
+                anim: mode === 'add' ? 'slideUp' : 'slideLeft',
+                shade: 0.1,
+                shadeClose: true,
+                id: mode === 'add' ? 'position-add-layer' : 'position-edit-layer',
+                area: mode === 'add' ? ['800px', '40%'] : ['480px', '40%'],
+                content: $('#position-form').html(),
+                success: function (layero) {
+                    let selectedPostType = mode === 'edit' && row ? row.postType : '';
+                    initPostTypeSelect(layero, selectedPostType);
+                    form.render();
+                    if (mode === 'edit' && row) {
+                        layero.find('[name="postCode"]').attr('data-original-post-code', row.postCode);
+                        layero.find('[name="postName"]').attr('data-original-post-name', row.postName);
+                        form.val('position-form', {
+                            postId: row.postId,
+                            postCode: row.postCode,
+                            postName: row.postName,
+                            postType: String(row.postType),
+                            orderNum: row.orderNum,
+                            isEnabled: String(row.isEnabled)
+                        });
+                    } else {
+                        form.val('position-form', {
+                            postId: '',
+                            postCode: '',
+                            postName: '',
+                            orderNum: 1,
+                            isEnabled: '0'
+                        });
+                    }
+                    form.render('select');
+                }
+            });
+        }
+
+        window.add = function () {
+            openPositionForm('add', null);
+        };
+
+        window.edit = function (obj) {
+            openPositionForm('edit', obj.data);
+        };
+
+        window.remove = function (obj) {
+            layer.confirm('确定要删除该岗位吗？', {icon: 3, title: '提示'}, function (index) {
+                layer.close(index);
+                let loading = layer.load();
+                // 调用后台删除当前岗位。
+                deleteJson(MODULE_PATH + '/delete', {ids: obj.data.postId}, {
+                    defaultMsg: '删除失败',
+                    success: function (result) {
+                        layer.close(loading);
+                        if (isAjaxSuccess(result)) {
+                            layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                                obj.del();
+                            });
+                        } else {
+                            layer.msg(result.msg || '删除失败', {icon: 2, time: 1000});
+                        }
+                    },
+                    error: function () {
+                        layer.close(loading);
+                    }
+                });
+            });
+        };
+
+        window.batchRemove = function (obj) {
+            let ids = getCheckedFieldIds(obj, 'postId');
+            if (ids === '') {
+                layer.msg('未选中数据', {icon: 3, time: 1000});
+                return false;
+            }
+            layer.confirm('确定要删除这些岗位吗？', {icon: 3, title: '提示'}, function (index) {
+                layer.close(index);
+                let loading = layer.load();
+                // 调用后台批量删除选中的岗位。
+                deleteJson(MODULE_PATH + '/delete', {ids: ids}, {
+                    defaultMsg: '删除失败',
+                    success: function (result) {
+                        layer.close(loading);
+                        if (isAjaxSuccess(result)) {
+                            layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                                table.reload('position-table');
+                            });
+                        } else {
+                            layer.msg(result.msg || '删除失败', {icon: 2, time: 1000});
+                        }
+                    },
+                    error: function () {
+                        layer.close(loading);
+                    }
+                });
+            });
+        };
+
+        window.refresh = function () {
+            table.reload('position-table');
+        };
+    });
+</script>
+</body>
+</html>

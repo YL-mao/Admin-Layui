@@ -1,0 +1,142 @@
+.layui-form {
+	width: fit-content !important;
+	min-width: 320px !important;
+	margin: auto !important;
+	margin-top: 160px !important;
+}
+
+.layui-form button {
+	width: 100% !important;
+	min-width: 320px !important;
+	height: 44px !important;
+	line-height: 44px !important;
+	font-size: 16px !important;
+	background-color: #5FB878 !important;
+	font-weight: 550 !important;
+}
+
+.layui-form-checked[lay-skin=primary] i {
+	border-color: #5FB878 !important;
+	background-color: #5FB878 !important;
+	color: #fff !important;
+}
+
+.layui-tab-content {
+	margin-top: 15px !important;
+	padding-left: 0px !important;
+	padding-right: 0px !important;
+}
+
+.layui-form-item {
+	margin-top: 20px !important;
+}
+
+.layui-input {
+	height: 44px !important;
+	line-height: 44px !important;
+	padding-left: 15px !important;
+	border-radius: 3px !important;
+	min-width: 320px !important;
+	box-sizing: border-box !important;
+}
+
+.layui-input.code {
+	min-width: 0 !important;
+	width: auto !important;
+}
+
+.layui-input:focus {
+	box-shadow: 0px 0px 2px 1px #5FB878 !important;
+}
+
+.layui-form-danger:focus{
+	box-shadow: 0px 0px 2px 1px #f56c6c !important;
+}
+
+.logo {
+	width: 60px !important;
+	height: 60px !important;
+	object-fit: contain;
+	flex-shrink: 0;
+	margin: 0 !important;
+}
+
+/* Logo 与系统名同一行；表单随标题变宽，保证单行完整显示。 */
+.login-brand {
+	display: flex !important;
+	flex-wrap: nowrap !important;
+	align-items: center !important;
+	justify-content: center !important;
+	gap: 12px !important;
+	width: 100% !important;
+	min-height: 60px !important;
+	box-sizing: border-box !important;
+}
+
+.title {
+	font-size: 30px !important;
+	font-weight: 550 !important;
+	margin: 0 !important;
+	color: #f0d78c !important;
+	text-shadow: 0 0 24px rgba(255, 217, 90, 0.25);
+	display: block !important;
+	position: static !important;
+	height: auto !important;
+	line-height: 60px !important;
+	white-space: nowrap !important;
+}
+
+.desc {
+	width: 100% !important;
+	text-align: center !important;
+	color: #9aa5b8 !important;
+	height: 60px !important;
+	line-height: 60px !important;
+}
+
+/* 登录页：html/body 占满视口，禁止整页滚动（与脚手架原版 height:100% 思路一致） */
+html,
+body.login-page {
+	margin: 0;
+	height: 100%;
+	overflow: hidden;
+	background-color: #060910;
+}
+
+/* 自适应全屏 SVG，等同原 th:background + background-size: cover */
+.login-page-bg {
+	position: fixed;
+	inset: 0;
+	z-index: 0;
+	pointer-events: none;
+	background-color: #060910;
+	background-repeat: no-repeat;
+	background-position: center center;
+	background-size: cover;
+}
+
+body.login-page .layui-form {
+	position: relative;
+	z-index: 1;
+}
+
+.code {
+	float: left;
+	margin-right: 13px;
+	margin: 0px !important;
+	border: #e6e6e6 1px solid;
+	display: inline-block!important;
+}
+
+.codeImage {
+	float: right;
+	height: 42px;
+	border: #e6e6e6 1px solid;
+	cursor: pointer;
+}
+
+@media (max-width:768px){
+	.login-page-bg{
+		background-position: center center;
+	}
+}

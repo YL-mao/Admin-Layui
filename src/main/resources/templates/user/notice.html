@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{include :: header('公告列表')}"></head>
+    <style>
+        /* 收件箱标题前的未读圆点，与 Layui badge-dot 配合使用。 */
+        .user-notice-title {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .user-notice-detail-meta {
+            margin-bottom: 12px;
+        }
+
+        .user-notice-detail-meta .layui-badge {
+            margin-right: 8px;
+        }
+
+        .user-notice-detail-content {
+            margin: 0;
+            color: #333;
+            line-height: 1.8;
+        }
+
+        /* 未读角标可点击，跳转未读筛选。 */
+        .user-notice-unread-trigger {
+            cursor: pointer;
+        }
+    </style>
+<body class="pear-container">
+<div class="layui-card">
+    <div class="layui-card-body">
+        <form class="layui-form" lay-filter="user-notice-query-form" action="">
+            <div class="layui-form-item">
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">公告标题</label>
+                    <div class="layui-input-inline">
+                        <input type="text" name="noticeTitle" placeholder="请输入公告标题" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">公告类型</label>
+                    <div class="layui-input-inline">
+                        <select name="noticeType">
+                            <option value="">全部</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">阅读状态</label>
+                    <div class="layui-input-inline">
+                        <select name="readState">
+                            <option value="">全部</option>
+                            <option value="0">未读</option>
+                            <option value="1">已读</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <button class="pear-btn pear-btn-md pear-btn-primary" lay-submit lay-filter="user-notice-query">
+                        <i class="layui-icon layui-icon-search"></i>
+                        查询
+                    </button>
+                    <button type="reset" class="pear-btn pear-btn-md">
+                        <i class="layui-icon layui-icon-refresh"></i>
+                        重置
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="layui-card">
+    <div class="layui-card-body">
+        <table id="user-notice-table" lay-filter="user-notice-table"></table>
+    </div>
+</div>
+
+<script type="text/html" id="user-notice-toolbar">
+    <button class="pear-btn pear-btn-primary pear-btn-md" lay-event="readAll">
+        <i class="layui-icon layui-icon-ok-circle"></i>
+        全部标为已读
+    </button>
+    <span class="layui-font-12 layui-font-gray" style="margin-left: 12px;">
+        未读
+        <span class="layui-badge user-notice-unread-trigger" id="user-notice-unread-count" title="点击查看全部未读">0</span>
+    </span>
+</script>
+
+<script type="text/html" id="user-notice-bar">
+    <button class="pear-btn pear-btn-primary pear-btn-sm" lay-event="view" title="查看详情">
+        <i class="layui-icon layui-icon-read"></i>
+    </button>
+</script>
+
+<script type="text/html" id="user-notice-title" th:inline="none">
+{{# if(d.readState == 0){ }}
+    <span class="user-notice-title">
+        <span class="layui-badge-dot"></span>
+        <span>{{ d.noticeTitle }}</span>
+    </span>
+{{# } else { }}
+    <span>{{ d.noticeTitle }}</span>
+{{# } }}
+</script>
+
+<script type="text/html" id="user-notice-type" th:inline="none">
+    <span class="layui-badge layui-bg-blue">{{ d.noticeTypeName || '其他' }}</span>
+</script>
+
+<script type="text/html" id="user-notice-read" th:inline="none">
+{{# if(d.readState == 1){ }}
+    <span class="layui-badge layui-bg-green">已读</span>
+{{# } else { }}
+    <span class="layui-badge">未读</span>
+{{# } }}
+</script>
+
+<script type="text/html" id="user-notice-detail" th:inline="none">
+<div style="padding: 16px 20px 8px;">
+    <div class="user-notice-detail-meta">
+        <span class="layui-badge layui-bg-blue">{{ d.noticeTypeName || '其他' }}</span>
+        {{# if(d.readState == 0){ }}
+            <span class="layui-badge">未读</span>
+        {{# } else { }}
+            <span class="layui-badge layui-bg-green">已读</span>
+        {{# } }}
+    </div>
+    <table class="layui-table" lay-size="sm" style="margin: 0 0 12px;">
+        <colgroup>
+            <col width="96">
+            <col>
+        </colgroup>
+        <tbody>
+        <tr>
+            <td>接收时间</td>
+            <td>{{ d.sendTime || '-' }}</td>
+        </tr>
+        <tr>
+            <td>阅读时间</td>
+            <td>{{ d.readTime || '尚未阅读' }}</td>
+        </tr>
+        </tbody>
+    </table>
+    <blockquote class="layui-elem-quote user-notice-detail-content">{{ d.noticeContent || '暂无公告内容' }}</blockquote>
+</div>
+</script>
+
+<th:block th:insert="~{include :: footer}"/>
+<script>
+    /* global layui, apiPath, getAjaxErrorMsg */
+    layui.use(['common', 'table', 'form', 'jquery', 'layer', 'laytpl'], function () {
+        let table = layui.table;
+        let form = layui.form;
+        let $ = layui.jquery;
+        let layer = layui.layer;
+        let laytpl = layui.laytpl;
+        let MODULE_PATH = apiPath + '/user/notice';
+
+        // 从后台加载公告类型字典，供查询筛选渲染。
+        loadDict(DictTypeCode.SYS_NOTICE_TYPE).done(function () {
+            fillDictQuerySelect($('select[name="noticeType"]'), DictTypeCode.SYS_NOTICE_TYPE);
+            form.render('select');
+        });
+
+        // 列宽不指定，由 Layui table 按容器与内容自适应。
+        let cols = [
+            [
+                {title: '公告标题', field: 'noticeTitle', templet: '#user-notice-title'},
+                {title: '公告类型', field: 'noticeTypeName', align: 'center', templet: '#user-notice-type'},
+                {title: '接收时间', field: 'sendTime', align: 'center'},
+                {title: '阅读状态', field: 'readState', align: 'center', templet: '#user-notice-read'},
+                {title: '操作', toolbar: '#user-notice-bar', align: 'center'}
+            ]
+        ];
+
+        // 从后台分页加载当前用户的公告列表。
+        table.render({
+            response: TABLE_RESPONSE,
+            elem: '#user-notice-table',
+            id: 'user-notice-table',
+            toolbar: '#user-notice-toolbar',
+            url: MODULE_PATH + '/list',
+            defaultToolbar: [{
+                title: '刷新',
+                layEvent: 'refresh',
+                icon: 'layui-icon-refresh'
+            }, 'filter'],
+            page: true,
+            limit: 10,
+            skin: 'line',
+            text: {none: '暂无公告消息'},
+            cols: cols,
+            done: function () {
+                refreshUnreadCount();
+            }
+        });
+
+        table.on('toolbar(user-notice-table)', function (obj) {
+            if (obj.event === 'readAll') {
+                readAllNotices();
+            } else if (obj.event === 'refresh') {
+                reloadTable();
+            }
+        });
+
+        table.on('tool(user-notice-table)', function (obj) {
+            if (obj.event === 'view') {
+                openNoticeDetail(obj);
+            }
+        });
+
+        table.on('row(user-notice-table)', function (obj) {
+            openNoticeDetail(obj);
+        });
+
+        // 工具栏每次渲染后角标会重建，用事件委托绑定点击。
+        $(document).on('click', '#user-notice-unread-count', function (e) {
+            e.stopPropagation();
+            filterUnreadNotices();
+        });
+
+        form.on('submit(user-notice-query)', function (data) {
+            table.reload('user-notice-table', {
+                where: data.field,
+                page: {curr: 1}
+            });
+            return false;
+        });
+
+        $('form.layui-form').on('reset', function () {
+            setTimeout(function () {
+                form.render('select');
+                table.reload('user-notice-table', {
+                    where: {},
+                    page: {curr: 1}
+                });
+            });
+        });
+
+        function reloadTable() {
+            table.reload('user-notice-table');
+            refreshUnreadCount();
+        }
+
+        /** 重置筛选并只查未读公告。 */
+        function filterUnreadNotices() {
+            let $form = $('form[lay-filter="user-notice-query-form"]');
+            $form.find('[name="noticeTitle"]').val('');
+            $form.find('[name="noticeType"]').val('');
+            $form.find('[name="readState"]').val('0');
+            form.render('select');
+            table.reload('user-notice-table', {
+                where: {
+                    noticeTitle: '',
+                    noticeType: '',
+                    readState: '0'
+                },
+                page: {curr: 1}
+            });
+        }
+
+        function refreshNoticeHeader() {
+            if (window.top && window.top !== window && window.top.refreshNoticeHeader) {
+                window.top.refreshNoticeHeader();
+            }
+        }
+
+        function refreshUnreadCount() {
+            // 按当前筛选条件向后台刷新公告统计。
+            getJson(MODULE_PATH + '/list', {page: 1, limit: 1, readState: 0}, {
+                showMsg: false,
+                success: function (result) {
+                    if (isAjaxSuccess(result)) {
+                        $('#user-notice-unread-count').text(result.count || 0);
+                    }
+                }
+            });
+        }
+
+        function readAllNotices() {
+            let unreadCount = Number($('#user-notice-unread-count').text() || 0);
+            if (!unreadCount) {
+                layer.msg('当前没有未读公告', {icon: 0, time: 1200});
+                return;
+            }
+            // 调用后台将当前用户的公告全部标记为已读。
+            patchJson(MODULE_PATH + '/readAll', null, {
+                defaultMsg: '操作失败',
+                success: function (result) {
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg || '已全部标为已读', {icon: 1, time: 1200});
+                        reloadTable();
+                        refreshNoticeHeader();
+                    } else {
+                        layer.msg(result.msg || '操作失败', {icon: 2, time: 1200});
+                    }
+                }
+            });
+        }
+
+        function markAsRead(obj, callback) {
+            let row = obj.data;
+            if (row.readState !== 0) {
+                callback && callback(row);
+                return;
+            }
+            // 调用后台将当前公告标记为已读。
+            patchJson(MODULE_PATH + '/updateRead', {noticeId: row.noticeId}, {
+                defaultMsg: '标记已读失败',
+                success: function (result) {
+                    if (isAjaxSuccess(result)) {
+                        row.readState = 1;
+                        row.readTime = formatNow();
+                        obj.update(row);
+                        refreshUnreadCount();
+                        refreshNoticeHeader();
+                        callback && callback(row);
+                    } else {
+                        layer.msg(result.msg || '标记已读失败', {icon: 2, time: 1200});
+                    }
+                }
+            });
+        }
+
+        function openNoticeDetail(obj) {
+            markAsRead(obj, function (row) {
+                let content = laytpl($('#user-notice-detail').html()).render(row);
+                layer.open({
+                    type: 1,
+                    title: escapeHtml(row.noticeTitle),
+                    area: ['720px', '520px'],
+                    shadeClose: true,
+                    content: content
+                });
+            });
+        }
+
+        function escapeHtml(value) {
+            if (value == null || value === '') {
+                return '';
+            }
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function formatNow() {
+            let date = new Date();
+            let pad = function (num) {
+                return num < 10 ? '0' + num : '' + num;
+            };
+            return date.getFullYear() + '-'
+                + pad(date.getMonth() + 1) + '-'
+                + pad(date.getDate()) + ' '
+                + pad(date.getHours()) + ':'
+                + pad(date.getMinutes()) + ':'
+                + pad(date.getSeconds());
+        }
+    });
+</script>
+</body>
+</html>

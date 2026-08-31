@@ -1,0 +1,789 @@
+﻿<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sa="https://www.thymeleaf.org/extras/sa-token" lang="en">
+<head th:replace="~{include :: header('行为日志')}"></head>
+<body class="pear-container">
+<style>
+    /* 抽屉内表单项加宽标签，避免「登录日志开关」等换行。 */
+    .log-drawer-form .layui-form-label {
+        width: 110px;
+        white-space: nowrap;
+    }
+    .log-drawer-form .layui-input-block {
+        margin-left: 140px;
+    }
+</style>
+<div class="layui-card">
+    <div class="layui-card-body">
+        <form class="layui-form" lay-filter="log-query" action="">
+            <!-- 日志筛选只控制当前页签数据，日志类型仍由页签固定传入。 -->
+            <div class="layui-row" style="margin-bottom: 10px;">
+                <!-- 使用四列栅格对齐筛选项，列内用 input-block 避免输入框被挤到下一行。 -->
+                <div class="layui-col-md3" style="padding-right: 24px;">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">操作模块</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="operateTitle" placeholder="请输入操作模块" class="layui-input">
+                        </div>
+                    </div>
+                </div>
+                <div class="layui-col-md3" style="padding-right: 24px;">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">业务类型</label>
+                        <div class="layui-input-block">
+                            <select name="businessType">
+                                <option value="">请选择业务类型</option>
+                                <option value="QUERY">查询</option>
+                                <option value="ADD">新增</option>
+                                <option value="UPDATE">修改</option>
+                                <option value="DELETE">删除</option>
+                                <option value="LOGIN">登录</option>
+                                <option value="LOGOUT">退出</option>
+                                <option value="OTHER">其他</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="layui-col-md3" style="padding-right: 24px;">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">访问状态</label>
+                        <div class="layui-input-block">
+                            <select name="isSuccess">
+                                <option value="">请选择访问状态</option>
+                                <option value="1">成功</option>
+                                <option value="0">失败</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="layui-col-md3" style="padding-right: 24px;">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">操作人</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="operateName" placeholder="请输入操作人" class="layui-input">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="layui-row">
+                <!-- 第二行沿用四列宽度，按钮占一个条件位。 -->
+                <div class="layui-col-md3" style="padding-right: 24px;">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">操作IP</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="operateIp" placeholder="请输入操作IP" class="layui-input">
+                        </div>
+                    </div>
+                </div>
+                <div class="layui-col-md3" style="padding-right: 24px;">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">时间范围</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="operateTimeRange" id="log-time-range" placeholder="请选择时间范围" class="layui-input">
+                        </div>
+                    </div>
+                </div>
+                <div class="layui-col-md3" style="padding-right: 24px;">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">接口路径</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="requestUri" placeholder="请输入接口路径" class="layui-input">
+                        </div>
+                    </div>
+                </div>
+                <div class="layui-col-md3">
+                    <div class="layui-form-item">
+                        <button class="pear-btn pear-btn-primary" lay-submit lay-filter="log-query-submit">
+                            <i class="layui-icon layui-icon-search"></i> 查询
+                        </button>
+                        <button type="reset" class="pear-btn">
+                            <i class="layui-icon layui-icon-refresh"></i> 重置
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="layui-card">
+    <!-- 日志配置放在筛选区与页签之间的卡片头夹缝，不进入 tab 标题行。 -->
+    <div class="layui-card-header">
+        <button sa:hasPermission="system:config:log" type="button" class="pear-btn pear-btn-md" id="btn-log-config">
+            <i class="layui-icon layui-icon-set"></i> 日志配置
+        </button>
+    </div>
+    <div class="layui-card-body">
+        <div class="layui-tab layui-tab-card" lay-filter="log-tab">
+            <ul class="layui-tab-title">
+                <li class="layui-this" lay-id="LOGIN">登录日志</li>
+                <li lay-id="OPERATE">操作日志</li>
+                <li lay-id="CONFIG">配置变更</li>
+            </ul>
+            <div class="layui-tab-content">
+                <div class="layui-tab-item layui-show">
+                    <table style="margin-top: 10px;" id="log-login-table" lay-filter="log-table"></table>
+                </div>
+                <div class="layui-tab-item">
+                    <table style="margin-top: 10px;" id="log-operate-table" lay-filter="log-table"></table>
+                </div>
+                <div class="layui-tab-item">
+                    <table style="margin-top: 10px;" id="log-config-table" lay-filter="log-table"></table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+
+    <script type="text/html" id="log-bar">
+    {{#if (d.isSuccess == 1) { }}
+    <button sa:hasPermission="system:log:select" class="pear-btn pear-btn-sm pear-btn-success" lay-event="detail"><i class="layui-icon layui-icon-ok"></i>
+        成功</button>
+    {{# }else { }}
+    <button sa:hasPermission="system:log:select" class="pear-btn pear-btn-sm pear-btn-danger" lay-event="detail"><i class="layui-icon layui-icon-help"></i>
+        异常</button>
+    {{# } }}
+    </script>
+
+    <script type="text/html" id="log-operateTime">
+    {{layui.util.toDateString(d.operateTime,  "yyyy-MM-dd HH:mm:ss")}}
+    </script>
+
+    <script type="text/html" id="log-detail-form">
+        <!-- 日志详情只读展示，避免从列表进入时误修改审计数据；统一带底栏抽屉。 -->
+        <form class="layui-form" lay-filter="log-detail" action="">
+            <div class="mainBox">
+                <div class="main-container">
+            <!-- 使用 Layui 栅格控制详情字段宽度，普通字段半行，长文本字段整行。 -->
+            <div class="layui-row layui-col-space16">
+                <div class="layui-col-md6">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">日志ID</label>
+                        <div class="layui-input-block"><input type="text" name="operateId" readonly class="layui-input"></div>
+                    </div>
+                </div>
+                <div class="layui-col-md6">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">日志类型</label>
+                        <div class="layui-input-block"><input type="text" name="loggingType" readonly class="layui-input"></div>
+                    </div>
+                </div>
+                <div class="layui-col-md6">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">业务类型</label>
+                        <div class="layui-input-block"><input type="text" name="businessType" readonly class="layui-input"></div>
+                    </div>
+                </div>
+                <div class="layui-col-md6">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">模块标题</label>
+                        <div class="layui-input-block"><input type="text" name="operateTitle" readonly class="layui-input"></div>
+                    </div>
+                </div>
+                <div class="layui-col-md6">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">请求方式</label>
+                        <div class="layui-input-block"><input type="text" name="requestMethod" readonly class="layui-input"></div>
+                    </div>
+                </div>
+                <div class="layui-col-md6">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">接口路径</label>
+                        <div class="layui-input-block"><input type="text" name="requestUri" readonly class="layui-input"></div>
+                    </div>
+                </div>
+                <div class="layui-col-md12">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">后端方法</label>
+                        <div class="layui-input-block"><input type="text" name="operateMethod" readonly class="layui-input"></div>
+                    </div>
+                </div>
+                <div class="layui-col-md12">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">请求参数</label>
+                        <div class="layui-input-block"><textarea name="requestParam" readonly class="layui-textarea"></textarea></div>
+                    </div>
+                </div>
+                <div class="layui-col-md12">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">请求体</label>
+                        <div class="layui-input-block"><textarea name="requestBody" readonly class="layui-textarea"></textarea></div>
+                    </div>
+                </div>
+                <div class="layui-col-md12">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">响应体</label>
+                        <div class="layui-input-block"><textarea name="responseBody" readonly class="layui-textarea"></textarea></div>
+                    </div>
+                </div>
+                <div class="layui-col-md6">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">是否成功</label>
+                        <div class="layui-input-block"><input type="text" name="successText" readonly class="layui-input"></div>
+                    </div>
+                </div>
+                <div class="layui-col-md6">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">HTTP状态</label>
+                        <div class="layui-input-block"><input type="text" name="statusCode" readonly class="layui-input"></div>
+                    </div>
+                </div>
+                <div class="layui-col-md6">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">异常类</label>
+                        <div class="layui-input-block"><input type="text" name="errorClass" readonly class="layui-input"></div>
+                    </div>
+                </div>
+                <div class="layui-col-md12">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">错误信息</label>
+                        <div class="layui-input-block"><textarea name="errorMsg" readonly class="layui-textarea"></textarea></div>
+                    </div>
+                </div>
+                <div class="layui-col-md12">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">错误堆栈</label>
+                        <div class="layui-input-block"><textarea name="errorStack" readonly class="layui-textarea" style="min-height: 180px;"></textarea></div>
+                    </div>
+                </div>
+                <div class="layui-col-md6">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">用户ID</label>
+                        <div class="layui-input-block"><input type="text" name="userId" readonly class="layui-input"></div>
+                    </div>
+                </div>
+                <div class="layui-col-md6">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">操作人</label>
+                        <div class="layui-input-block"><input type="text" name="operateName" readonly class="layui-input"></div>
+                    </div>
+                </div>
+                <div class="layui-col-md6">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">操作IP</label>
+                        <div class="layui-input-block"><input type="text" name="operateIp" readonly class="layui-input"></div>
+                    </div>
+                </div>
+                <div class="layui-col-md6">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">服务IP</label>
+                        <div class="layui-input-block"><input type="text" name="serverIp" readonly class="layui-input"></div>
+                    </div>
+                </div>
+                <div class="layui-col-md12">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">浏览器UA</label>
+                        <div class="layui-input-block"><textarea name="userAgent" readonly class="layui-textarea"></textarea></div>
+                    </div>
+                </div>
+                <div class="layui-col-md6">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">浏览器</label>
+                        <div class="layui-input-block"><input type="text" name="browser" readonly class="layui-input"></div>
+                    </div>
+                </div>
+                <div class="layui-col-md6">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">操作系统</label>
+                        <div class="layui-input-block"><input type="text" name="systemOs" readonly class="layui-input"></div>
+                    </div>
+                </div>
+                <div class="layui-col-md6">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">链路ID</label>
+                        <div class="layui-input-block"><input type="text" name="traceId" readonly class="layui-input"></div>
+                    </div>
+                </div>
+                <div class="layui-col-md6">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">耗时(ms)</label>
+                        <div class="layui-input-block"><input type="text" name="costTime" readonly class="layui-input"></div>
+                    </div>
+                </div>
+                <div class="layui-col-md6">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">操作时间</label>
+                        <div class="layui-input-block"><input type="text" name="operateTimeText" readonly class="layui-input"></div>
+                    </div>
+                </div>
+            </div>
+                </div>
+            </div>
+            <div class="bottom">
+                <div class="button-container">
+                    <button type="button" class="pear-btn pear-btn-sm" onclick="closeCurrentLayer()">
+                        <i class="layui-icon layui-icon-close"></i>
+                        关闭
+                    </button>
+                </div>
+            </div>
+        </form>
+    </script>
+
+    <div class="log-form-modal log-drawer-form" id="log-config-modal" style="display:none;">
+        <form class="layui-form" lay-filter="log-config-form" action="">
+            <div class="mainBox">
+                <div class="main-container" id="log-config-fields"></div>
+            </div>
+            <div class="bottom">
+                <div class="button-container">
+                    <button type="submit" class="pear-btn pear-btn-primary pear-btn-sm" lay-submit=""
+                            lay-filter="log-config-save">
+                        <i class="layui-icon layui-icon-ok"></i>
+                        提交
+                    </button>
+                    <button type="button" class="pear-btn pear-btn-danger pear-btn-sm" id="btn-log-clean-by-retention"
+                            title="按设置天数进行删除">
+                        <i class="layui-icon layui-icon-delete"></i>
+                        删除
+                    </button>
+                    <button type="button" class="pear-btn pear-btn-sm" onclick="closeCurrentLayer()">
+                        <i class="layui-icon layui-icon-close"></i>
+                        关闭
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+		<th:block th:insert="~{include :: footer}"/>
+<script>
+    /* global layui, apiPath */
+    layui.use(['common', 'table','form','jquery','element','laydate'],function () {
+        let table = layui.table;
+        let form = layui.form;
+        let $ = layui.jquery;
+        let element = layui.element;
+        let laydate = layui.laydate;
+
+        let MODULE_PATH = apiPath + '/operateLog';
+        let CONFIG_PATH = apiPath + '/config';
+        // CONFIG 页签仍查 OPERATE 日志，仅固定标题为「系统配置变更」。
+        let activeTab = 'LOGIN';
+        let CONFIG_OPERATE_TITLE = '系统配置变更';
+
+        let cols = [
+            [
+                {title: '模块', field: 'operateTitle', align:'center'},
+                {title: '业务类型', field: 'businessType', align:'center', width: 110},
+                {title: '请求方式', field: 'requestMethod', align:'center'},
+                {title: '接口', field: 'requestUri', align:'center'},
+                {title: '浏览器', field: 'browser', align:'center'},
+                {title: '操作地址', field: 'operateIp',align:'center'},
+                {title: '操作系统', field: 'systemOs', align:'center'},
+                {title: '访问时间', field: 'operateTime',templet:'#log-operateTime', align:'center'},
+                {title: '操作人', field: 'operateName', align:'center'},
+                {title: '耗时(ms)', field: 'costTime', align:'center', width: 100},
+                {title: '访问状态', toolbar: '#log-bar', align:'center', width:150}
+            ]
+        ];
+
+        // 配置变更页签：从审计 JSON 解析出编码/前后值，便于直接查看。
+        let configCols = [
+            [
+                {title: '配置编码', field: 'requestBody', align:'center', templet: function (d) {
+                    return textValue(rowConfigAudit(d).configCode);
+                }},
+                {title: '配置名称', field: 'requestBody', align:'center', templet: function (d) {
+                    return textValue(rowConfigAudit(d).configName);
+                }},
+                {title: '动作', field: 'requestBody', align:'center', width: 90, templet: function (d) {
+                    return configActionText(rowConfigAudit(d).action);
+                }},
+                {title: '内置', field: 'requestBody', align:'center', width: 80, templet: function (d) {
+                    return rowConfigAudit(d).isBuiltin == 1 ? '是' : '否';
+                }},
+                {title: '改前', field: 'requestBody', align:'center', templet: function (d) {
+                    return configChangeText(rowConfigAudit(d), true);
+                }},
+                {title: '改后', field: 'requestBody', align:'center', templet: function (d) {
+                    return configChangeText(rowConfigAudit(d), false);
+                }},
+                {title: '操作人', field: 'operateName', align:'center', width: 110},
+                {title: '访问时间', field: 'operateTime', templet: '#log-operateTime', align:'center', width: 170},
+                {title: '访问状态', toolbar: '#log-bar', align:'center', width: 120}
+            ]
+        ];
+
+        // 从后台分页加载操作日志列表。
+        table.render({
+            response: TABLE_RESPONSE,
+            elem: '#log-operate-table',
+            id: 'log-operate-table',
+            url: MODULE_PATH + '/list',
+            where: {loggingType: 'OPERATE'},
+            page: true ,
+            cols: cols ,
+            skin: 'line',
+            toolbar: false
+        });
+
+        // 按最新筛选条件重新向后台查询日志。
+        table.render({
+            response: TABLE_RESPONSE,
+            elem: '#log-login-table',
+            id: 'log-login-table',
+            url: MODULE_PATH + '/list',
+            where: {loggingType: 'LOGIN'},
+            page: true ,
+            cols: cols ,
+            skin: 'line',
+            toolbar: false
+        });
+
+        // 配置变更：固定标题筛选，列表直接展示审计字段。
+        table.render({
+            response: TABLE_RESPONSE,
+            elem: '#log-config-table',
+            id: 'log-config-table',
+            url: MODULE_PATH + '/list',
+            where: {loggingType: 'OPERATE', operateTitle: CONFIG_OPERATE_TITLE, operateTitleExact: true},
+            page: true,
+            cols: configCols,
+            skin: 'line',
+            toolbar: false
+        });
+
+        laydate.render({
+            elem: '#log-time-range',
+            type: 'datetime',
+            range: true
+        });
+
+        element.on('tab(log-tab)', function (data) {
+            // 记录当前页签，查询时只刷新对应日志表格。
+            if (data.index === 0) {
+                activeTab = 'LOGIN';
+            } else if (data.index === 1) {
+                activeTab = 'OPERATE';
+            } else {
+                activeTab = 'CONFIG';
+            }
+        });
+
+        table.on('tool(log-table)', function (obj) {
+            if (obj.event === 'detail') {
+                window.detail(obj);
+            }
+        });
+
+        form.on('submit(log-query-submit)', function(data){
+            table.reload(getActiveTableId(), {
+                page: {curr: 1},
+                where: buildQueryWhere(data.field)
+            });
+            return false;
+        });
+
+        $('form[lay-filter="log-query"]').on('reset', function () {
+            setTimeout(function () {
+                // 重置后重新渲染 Layui 表单组件，保证下拉框显示和真实值一致。
+                form.render();
+                table.reload(getActiveTableId(), {
+                    page: {curr: 1},
+                    where: buildQueryWhere({})
+                });
+            }, 0);
+        });
+
+        $('#btn-log-config').on('click', function () {
+            openLogConfig();
+        });
+
+        form.on('submit(log-config-save)', function () {
+            saveLogConfig();
+            return false;
+        });
+
+        window.detail = function (obj) {
+            layer.open({
+                type: 1,
+                title: '日志详情',
+                offset: 'r',
+                anim: 'slideLeft',
+                area: ['980px', '100%'],
+                shade: 0.1,
+                shadeClose: true,
+                content: $('#log-detail-form').html(),
+                success: function () {
+                    // 将当前行日志写入只读表单，详情抽屉不再请求后端。
+                    form.val('log-detail', buildDetailData(obj.data));
+                }
+            });
+        }
+
+        function buildDetailData(row) {
+            // 转换展示字段，保证状态和时间在只读表单中直观可读。
+            return {
+                operateId: textValue(row.operateId),
+                loggingType: textValue(row.loggingType),
+                businessType: textValue(row.businessType),
+                operateTitle: textValue(row.operateTitle),
+                requestMethod: textValue(row.requestMethod),
+                operateMethod: textValue(row.operateMethod),
+                requestUri: textValue(row.requestUri),
+                requestParam: textValue(row.requestParam),
+                requestBody: formatConfigAuditBody(row.requestBody),
+                responseBody: textValue(row.responseBody),
+                successText: row.isSuccess == 1 ? '成功' : '失败',
+                statusCode: textValue(row.statusCode),
+                errorClass: textValue(row.errorClass),
+                errorMsg: textValue(row.errorMsg),
+                errorStack: textValue(row.errorStack),
+                userId: textValue(row.userId),
+                operateName: textValue(row.operateName),
+                operateIp: textValue(row.operateIp),
+                serverIp: textValue(row.serverIp),
+                userAgent: textValue(row.userAgent),
+                browser: textValue(row.browser),
+                systemOs: textValue(row.systemOs),
+                traceId: textValue(row.traceId),
+                costTime: textValue(row.costTime),
+                operateTimeText: row.operateTime ? layui.util.toDateString(row.operateTime, 'yyyy-MM-dd HH:mm:ss') : ''
+            };
+        }
+
+        function textValue(value) {
+            // 保留数字0这类有效值，只把空值转换为空字符串。
+            return value === null || value === undefined ? '' : value;
+        }
+
+        function parseConfigAudit(requestBody) {
+            // 解析配置审计 JSON；非审计体返回空对象，避免列表/详情报错。
+            if (!requestBody || typeof requestBody !== 'string') {
+                return {};
+            }
+            try {
+                let data = JSON.parse(requestBody);
+                return data && typeof data === 'object' ? data : {};
+            } catch (e) {
+                return {};
+            }
+        }
+
+        function rowConfigAudit(row) {
+            // 同行多列共用一次解析结果，避免重复 JSON.parse。
+            if (!row._configAudit) {
+                row._configAudit = parseConfigAudit(row.requestBody);
+            }
+            return row._configAudit;
+        }
+
+        function configActionText(action) {
+            if (action === 'INSERT') {
+                return '新增';
+            }
+            if (action === 'UPDATE') {
+                return '修改';
+            }
+            if (action === 'DELETE') {
+                return '删除';
+            }
+            if (action === 'ENABLE') {
+                return '启停';
+            }
+            return textValue(action);
+        }
+
+        function enabledText(value) {
+            if (value === 1 || value === '1') {
+                return '启用';
+            }
+            if (value === 0 || value === '0') {
+                return '停用';
+            }
+            return '';
+        }
+
+        function configChangeText(audit, isBefore) {
+            // 启停行展示状态；其它动作展示配置值。
+            if (audit.action === 'ENABLE') {
+                return enabledText(isBefore ? audit.beforeEnabled : audit.afterEnabled);
+            }
+            return textValue(isBefore ? audit.beforeValue : audit.afterValue);
+        }
+
+        function formatConfigAuditBody(requestBody) {
+            // 配置变更详情把 JSON 转成可读文本；其它日志仍展示原文。
+            let audit = parseConfigAudit(requestBody);
+            if (!audit.configCode) {
+                return textValue(requestBody);
+            }
+            return [
+                '动作：' + configActionText(audit.action),
+                '配置编码：' + textValue(audit.configCode),
+                '配置名称：' + textValue(audit.configName),
+                '是否内置：' + (audit.isBuiltin == 1 ? '是' : '否'),
+                '改前值：' + textValue(audit.beforeValue),
+                '改后值：' + textValue(audit.afterValue),
+                '改前状态：' + enabledText(audit.beforeEnabled),
+                '改后状态：' + enabledText(audit.afterEnabled)
+            ].join('\n');
+        }
+
+        function getActiveTableId() {
+            // 当前页签决定刷新登录 / 操作 / 配置变更表格。
+            if (activeTab === 'LOGIN') {
+                return 'log-login-table';
+            }
+            if (activeTab === 'CONFIG') {
+                return 'log-config-table';
+            }
+            return 'log-operate-table';
+        }
+
+        function buildQueryWhere(field) {
+            let timeRange = splitTimeRange(field.operateTimeRange);
+            let where = {
+                loggingType: activeTab === 'LOGIN' ? 'LOGIN' : 'OPERATE',
+                operateTitle: field.operateTitle || '',
+                businessType: field.businessType || '',
+                isSuccess: field.isSuccess || '',
+                operateName: field.operateName || '',
+                requestUri: field.requestUri || '',
+                operateIp: field.operateIp || '',
+                startTime: timeRange.startTime,
+                endTime: timeRange.endTime
+            };
+            // 配置变更页签固定标题并精确匹配，避免筛到其它操作日志。
+            if (activeTab === 'CONFIG') {
+                where.operateTitle = CONFIG_OPERATE_TITLE;
+                where.operateTitleExact = true;
+            }
+            return where;
+        }
+
+        function splitTimeRange(operateTimeRange) {
+            // Layui 时间范围格式为“开始时间 - 结束时间”，后端按两个边界查询。
+            if (!operateTimeRange || operateTimeRange.indexOf(' - ') === -1) {
+                return {startTime: '', endTime: ''};
+            }
+            let range = operateTimeRange.split(' - ');
+            return {startTime: range[0], endTime: range[1]};
+        }
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function buildLogConfigField(item) {
+            let value = escapeHtml(item.configValue || '');
+            let code = escapeHtml(item.configCode);
+            let id = escapeHtml(item.configId);
+            let name = escapeHtml(item.configName);
+            if (item.valueType === 'boolean') {
+                let checked = item.configValue === 'true' ? ' checked' : '';
+                return '<div class="layui-form-item" data-config-id="' + id + '" data-config-code="' + code + '" data-value-type="boolean"><label class="layui-form-label">' + name + '</label><div class="layui-input-block"><input type="checkbox" lay-skin="switch" lay-text="开启|关闭"' + checked + '></div></div>';
+            }
+            if (item.valueType === 'json') {
+                return '<div class="layui-form-item" data-config-id="' + id + '" data-config-code="' + code + '" data-value-type="json"><label class="layui-form-label">' + name + '</label><div class="layui-input-block"><textarea maxlength="1000" class="layui-textarea">' + value + '</textarea></div></div>';
+            }
+            let inputType = item.valueType === 'number' ? 'number' : 'text';
+            return '<div class="layui-form-item" data-config-id="' + id + '" data-config-code="' + code + '" data-value-type="' + escapeHtml(item.valueType) + '"><label class="layui-form-label">' + name + '</label><div class="layui-input-block"><input type="' + inputType + '" maxlength="1000" value="' + value + '" class="layui-input"></div></div>';
+        }
+
+        function saveLogConfig() {
+            let configs = [];
+            $('[lay-filter="log-config-form"] .layui-form-item[data-config-id]').each(function () {
+                let $item = $(this);
+                let valueType = $item.data('value-type');
+                let configValue = valueType === 'boolean'
+                    ? String($item.find('input[type="checkbox"]').prop('checked'))
+                    : $item.find('input,textarea,select').val();
+                configs.push({
+                    configId: $item.attr('data-config-id'),
+                    configCode: $item.attr('data-config-code'),
+                    configValue: configValue
+                });
+            });
+            let loading = layer.load();
+            // 复用系统配置分组保存接口。
+            putJson(CONFIG_PATH + '/updateGroup', {configGroup: 'log', configs: configs}, {
+                defaultMsg: '保存日志配置失败',
+                success: function (result) {
+                    layer.close(loading);
+                    if (isAjaxSuccess(result)) {
+                        layer.closeAll();
+                        layer.msg(result.msg, {icon: 1, time: 1000});
+                    } else {
+                        layer.msg(result.msg || '保存日志配置失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    layer.close(loading);
+                }
+            });
+        }
+
+        function openLogConfig() {
+            // 加载 log 分组配置，按左侧短抽屉编辑（字段少不通高）。
+            getJson(CONFIG_PATH + '/group', {configGroup: 'log'}, {
+                defaultMsg: '加载日志配置失败',
+                success: function (result) {
+                    if (!isAjaxSuccess(result)) {
+                        layer.msg(result.msg || '加载日志配置失败', {icon: 2, time: 1000});
+                        return;
+                    }
+                    let configs = result.data || [];
+                    let html = [];
+                    if (!configs.length) {
+                        html.push('<div class="layui-form-item"><div class="layui-input-block">暂无可维护配置</div></div>');
+                    }
+                    configs.forEach(function (item) {
+                        html.push(buildLogConfigField(item));
+                    });
+                    $('#log-config-fields').html(html.join(''));
+                    layer.open({
+                        type: 1,
+                        title: '日志配置',
+                        offset: 'l',
+                        anim: 'slideRight',
+                        // 仅 3 项，用短抽屉；字段多时才通高。
+                        area: ['560px', '42%'],
+                        shade: 0.1,
+                        shadeClose: true,
+                        id: 'log-config-layer',
+                        content: $('#log-config-modal'),
+                        success: function () {
+                            form.render(null, 'log-config-form');
+                            $('#btn-log-clean-by-retention').off('click').on('click', function () {
+                                // 按已保存的保留天数清理；0 天后端提示且不删。
+                                layer.confirm('按设置天数进行删除，确认清理过期日志吗？', {
+                                    icon: 3,
+                                    title: '提示'
+                                }, function (index) {
+                                    layer.close(index);
+                                    let loading = layer.load();
+                                    deleteJson(MODULE_PATH + '/cleanByRetention', null, {
+                                        defaultMsg: '清理失败',
+                                        success: function (result) {
+                                            layer.close(loading);
+                                            if (isAjaxSuccess(result)) {
+                                                layer.msg(result.msg || '清理完成', {icon: 1, time: 1500});
+                                                table.reload(getActiveTableId());
+                                            } else {
+                                                layer.msg(result.msg || '清理失败', {icon: 2, time: 1500});
+                                            }
+                                        },
+                                        error: function () {
+                                            layer.close(loading);
+                                        }
+                                    });
+                                });
+                            });
+                        }
+                    });
+                }
+            });
+        }
+
+        window.closeCurrentLayer = function () {
+            layer.close(layer.index);
+        };
+    })
+</script>
+</html>

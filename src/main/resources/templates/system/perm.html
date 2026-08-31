@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:sa="https://www.thymeleaf.org/extras/sa-token" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{include :: header('权限管理')}"></head>
+<body class="pear-container">
+<div class="layui-card">
+    <div class="layui-card-body">
+        <form action="" class="layui-form">
+            <div class="layui-form-item">
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">权限名称</label>
+                    <div class="layui-input-inline">
+                        <input class="layui-input" maxlength="255" name="permName" placeholder="请输入权限名称"
+                               type="text">
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">权限标识</label>
+                    <div class="layui-input-inline">
+                        <input class="layui-input" maxlength="255" name="permCode" placeholder="请输入权限标识"
+                               type="text">
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">路由地址</label>
+                    <div class="layui-input-inline">
+                        <input class="layui-input" maxlength="255" name="permUrl" placeholder="请输入路由地址"
+                               type="text">
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <button class="pear-btn pear-btn-md pear-btn-primary" lay-filter="permission-query" lay-submit>
+                        <i class="layui-icon layui-icon-search"></i>
+                        查询
+                    </button>
+                    <button class="pear-btn pear-btn-md" type="reset">
+                        <i class="layui-icon layui-icon-refresh"></i>
+                        重置
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="layui-card">
+    <div class="layui-card-body">
+        <table id="permission-table" lay-filter="permission-table"></table>
+    </div>
+</div>
+
+<script id="permission-toolbar" type="text/html">
+    <button sa:hasPermission="system:perm:insert" class="pear-btn pear-btn-primary pear-btn-md" lay-event="add">
+        <i class="layui-icon layui-icon-add-1"></i>
+        新增
+    </button>
+    <button sa:hasPermission="system:perm:delete" class="pear-btn pear-btn-danger pear-btn-md" lay-event="batchRemove">
+        <i class="layui-icon layui-icon-delete"></i>
+        删除
+    </button>
+    <button class="pear-btn pear-btn-success pear-btn-md" lay-event="expandAll">
+        <i class="layui-icon layui-icon-spread-left"></i>
+        展开
+    </button>
+    <button class="pear-btn pear-btn-success pear-btn-md" lay-event="foldAll">
+        <i class="layui-icon layui-icon-shrink-right"></i>
+        折叠
+    </button>
+</script>
+
+<script id="permission-bar" type="text/html">
+    <button sa:hasPermission="system:perm:insert" class="pear-btn pear-btn-primary pear-btn-sm" lay-event="addChild"><i
+            class="layui-icon layui-icon-add-1"></i></button>
+    <button sa:hasPermission="system:perm:update" class="pear-btn pear-btn-primary pear-btn-sm" lay-event="edit"><i
+            class="layui-icon layui-icon-edit"></i></button>
+    <button sa:hasPermission="system:perm:delete" class="pear-btn pear-btn-danger pear-btn-sm" lay-event="remove"><i
+            class="layui-icon layui-icon-delete"></i></button>
+</script>
+
+<script id="permission-type" type="text/html">
+    {{# if (d.permType == 0) { }}
+    <span>目录</span>
+    {{# } else if (d.permType == 1) { }}
+    <span>菜单</span>
+    {{# } else if (d.permType == 2) { }}
+    <span>按钮</span>
+    {{# } }}
+</script>
+
+<script id="permission-visible" th:inline="none" type="text/html">
+    {{# if(d.isEnabled == 1){ }}
+    <input sa:hasPermission="system:perm:updateEnabled" type="checkbox" name="isEnabled" value="{{d.permId}}"
+           lay-skin="switch" lay-text="启用|停用" lay-filter="permission-visible" checked/>
+    {{# } else { }}
+    <input sa:hasPermission="system:perm:updateEnabled" type="checkbox" name="isEnabled" value="{{d.permId}}"
+           lay-skin="switch" lay-text="启用|停用" lay-filter="permission-visible"/>
+    {{# } }}
+</script>
+
+<script id="permission-icon" type="text/html">
+    <i class="{{d.permIcon || ''}}"></i>
+</script>
+
+<script id="permission-form" type="text/html">
+    <form class="layui-form" lay-filter="permission-form" action="">
+        <div class="mainBox">
+            <div class="main-container">
+                <input type="hidden" name="permId">
+                <div class="layui-form-item">
+                    <label class="layui-form-label">上级权限</label>
+                    <div class="layui-input-block">
+                        <input type="hidden" name="parentId" value="0">
+                        <div class="perm-parent-select" style="position: relative;">
+                            <input type="text" id="perm-parent-label" readonly class="layui-input"
+                                   placeholder="请选择上级权限" style="cursor: pointer;">
+                            <div id="perm-parent-dropdown" class="layui-anim layui-anim-upbit"
+                                 style="display: none; position: absolute; left: 0; right: 0; top: 38px; z-index: 1000; max-height: 280px; overflow: auto; padding: 8px 12px; background: #fff; border: 1px solid #eee; border-radius: 2px; box-shadow: 0 2px 8px rgba(0,0,0,.12);">
+                                <div id="perm-parent-tree"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">权限名称</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="permName" lay-verify="required" maxlength="255"
+                               placeholder="请输入权限名称" autocomplete="off"
+                               class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">权限标识</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="permCode" lay-verify="permCodeFormat" maxlength="255"
+                               placeholder="例如 system:perm:view" autocomplete="off"
+                               class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">路由地址</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="permUrl" maxlength="255" placeholder="请输入路由地址"
+                               autocomplete="off" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">权限描述</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="permDesc" maxlength="255" placeholder="请输入权限描述"
+                               autocomplete="off" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">图标</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="permIcon" maxlength="255"
+                               placeholder="例如 layui-icon layui-icon-set-fill" autocomplete="off"
+                               class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">权限类型</label>
+                    <div class="layui-input-block">
+                        <input type="radio" name="permType" value="0" title="目录" checked>
+                        <input type="radio" name="permType" value="1" title="菜单">
+                        <input type="radio" name="permType" value="2" title="按钮">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">打开方式</label>
+                    <div class="layui-input-block">
+                        <input type="radio" name="isBlank" value="0" title="本页打开" checked>
+                        <input type="radio" name="isBlank" value="1" title="新窗口打开">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">排序</label>
+                    <div class="layui-input-block">
+                        <input type="number" name="orderNum" lay-verify="required|number" placeholder="请输入排序号"
+                               autocomplete="off" class="layui-input" value="1">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">状态</label>
+                    <div class="layui-input-block">
+                        <input type="radio" name="isEnabled" value="1" title="启用">
+                        <input type="radio" name="isEnabled" value="0" title="停用" checked>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="bottom">
+            <div class="button-container">
+                <button sa:hasPermissionOr="system:perm:insert,system:perm:update" type="submit"
+                        class="pear-btn pear-btn-primary pear-btn-sm" lay-submit lay-filter="permission-save">
+                    <i class="layui-icon layui-icon-ok"></i>
+                    提交
+                </button>
+                <button type="button" class="pear-btn pear-btn-sm" onclick="closeCurrentLayer()">
+                    <i class="layui-icon layui-icon-close"></i>
+                    关闭
+                </button>
+            </div>
+        </div>
+    </form>
+</script>
+
+<th:block th:insert="~{include :: footer}"/>
+<script>
+    layui.use(['common', 'treeTable', 'form', 'jquery', 'layer', 'tree'], function () {
+        let treeTable = layui.treeTable;
+        let form = layui.form;
+        let $ = layui.jquery;
+        let layer = layui.layer;
+        let tree = layui.tree;
+        let MODULE_PATH = apiPath + "/perm";
+        let queryWhere = {};
+        let currentPermissionLayerIndex = null;
+        let parentPermList = [];
+        let tableRendered = false;
+
+        form.verify({
+            permCodeFormat: function (value) {
+                // 权限标识保留冒号分段风格，同时限制为可控编码字符。
+                if (value && !/^[A-Za-z0-9_:-]+$/.test(value)) {
+                    return '权限标识只能包含字母、数字、下划线、中划线和冒号';
+                }
+            }
+        });
+
+        window.render = function (where) {
+            queryWhere = where || {};
+            if (tableRendered) {
+                treeTable.reload('permission-table', {where: queryWhere});
+                return;
+            }
+            tableRendered = true;
+            // 从后台加载权限树表格数据。
+            treeTable.render({
+                response: TABLE_RESPONSE,
+                elem: '#permission-table',
+                id: 'permission-table',
+                url: MODULE_PATH + '/list',
+                method: 'get',
+                where: queryWhere,
+                page: false,
+                skin: 'line',
+                toolbar: '#permission-toolbar',
+                tree: {
+                    customName: {
+                        id: 'permId',
+                        pid: 'parentId',
+                        name: 'permName'
+                    },
+                    data: {
+                        // 后端返回平铺列表，根节点 parentId 为 0
+                        isSimpleData: true,
+                        rootPid: '0'
+                    },
+                    view: {
+                        expandAllDefault: false
+                    }
+                },
+                cols: [
+                    [
+                        {type: 'checkbox'},
+                        {field: 'permName', title: '权限名称'},
+                        {field: 'permCode', title: '权限标识', align: 'center'},
+                        {field: 'permUrl', title: '路由地址', align: 'center'},
+                        {field: 'permIcon', title: '图标', templet: '#permission-icon', align: 'center'},
+                        {field: 'permType', title: '权限类型', templet: '#permission-type', align: 'center'},
+                        {field: 'isEnabled', title: '状态', templet: '#permission-visible', align: 'center'},
+                        {field: 'orderNum', title: '排序', align: 'center'},
+                        {title: '操作', templet: '#permission-bar', align: 'center'}
+                    ]
+                ],
+                done: function () {
+                    form.render('checkbox');
+                }
+            });
+        };
+
+        render();
+
+        form.on('submit(permission-query)', function (data) {
+            render(data.field);
+            return false;
+        });
+
+        form.on('switch(permission-visible)', function (obj) {
+            // isEnabled 使用 0/1 布尔语义，1 表示启用，0 表示停用。
+            let isEnabled = obj.elem.checked ? 1 : 0;
+            // 调用后台切换权限启停状态。
+            patchJson(MODULE_PATH + '/updateEnabled', {
+                permId: this.value,
+                isEnabled: isEnabled
+            }, {
+                defaultMsg: '状态更新失败',
+                success: function (result) {
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg, {icon: 1, time: 1000});
+                    } else {
+                        obj.elem.checked = !obj.elem.checked;
+                        form.render('checkbox');
+                        layer.msg(result.msg || '状态更新失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    obj.elem.checked = !obj.elem.checked;
+                    form.render('checkbox');
+                }
+            });
+        });
+
+        treeTable.on('tool(permission-table)', function (obj) {
+            if (obj.event === 'remove') {
+                window.remove(obj);
+            } else if (obj.event === 'edit') {
+                window.edit(obj);
+            } else if (obj.event === 'addChild') {
+                window.addChild(obj);
+            }
+        });
+
+        treeTable.on('toolbar(permission-table)', function (obj) {
+            if (obj.event === 'add') {
+                window.add();
+            } else if (obj.event === 'refresh') {
+                window.refresh();
+            } else if (obj.event === 'batchRemove') {
+                window.batchRemove(obj);
+            } else if (obj.event === 'expandAll') {
+                treeTable.expandAll('permission-table', true);
+            } else if (obj.event === 'foldAll') {
+                treeTable.expandAll('permission-table', false);
+            }
+        });
+
+        function loadParentPerms(callback) {
+            // 调用后台加载可选的上级权限节点。
+            getJson(MODULE_PATH + '/selectParent', null, {
+                showMsg: false,
+                success: function (result) {
+                    parentPermList = isAjaxSuccess(result) ? (result.data || []) : [];
+                    callback();
+                },
+                error: function () {
+                    parentPermList = [];
+                    callback();
+                }
+            });
+        }
+
+        function buildParentTreeData(list, parentId, selectedId) {
+            return list.filter(function (item) {
+                return String(item.parentId) === String(parentId);
+            }).map(function (item) {
+                let children = buildParentTreeData(list, item.permId, selectedId);
+                return {
+                    title: item.permName,
+                    id: item.permId,
+                    spread: item.permId === selectedId || children.some(function (child) {
+                        return child.spread || child.id === selectedId;
+                    }),
+                    children: children
+                };
+            });
+        }
+
+        function findParentPerm(permId) {
+            for (let i = 0; i < parentPermList.length; i++) {
+                if (parentPermList[i].permId === permId) {
+                    return parentPermList[i];
+                }
+            }
+            return null;
+        }
+
+        /** 上级权限：点击输入框弹出无连接线树下拉。 */
+        function bindParentDropdown(layero, selectedParentId) {
+            let selectedId = selectedParentId || '0';
+            let $hidden = layero.find('[name="parentId"]');
+            let $label = layero.find('#perm-parent-label');
+            let $dropdown = layero.find('#perm-parent-dropdown');
+            let $treeElem = layero.find('#perm-parent-tree');
+            let treeId = 'perm-parent-tree-' + Date.now();
+            $treeElem.attr('id', treeId);
+            $hidden.val(selectedId);
+            let selected = findParentPerm(selectedId);
+            $label.val(selected ? selected.permName : '顶级权限');
+
+            tree.render({
+                elem: '#' + treeId,
+                id: treeId,
+                data: buildParentTreeData(parentPermList, '-1', selectedId),
+                showLine: false,
+                onlyIconControl: true,
+                click: function (obj) {
+                    $hidden.val(obj.data.id);
+                    $label.val(obj.data.title);
+                    $dropdown.hide();
+                }
+            });
+
+            $label.off('click.permParent').on('click.permParent', function (e) {
+                e.stopPropagation();
+                $dropdown.toggle();
+            });
+            $dropdown.off('click.permParent').on('click.permParent', function (e) {
+                e.stopPropagation();
+            });
+            $(document).off('click.permParentDropdown').on('click.permParentDropdown', function () {
+                $dropdown.hide();
+            });
+        }
+
+        function checkPermNameUnique(parentId, permName, callback) {
+            // 调用后台校验同级权限名称是否已存在。
+            checkUnique(MODULE_PATH + '/checkName', {parentId: parentId, permName: permName}, callback);
+        }
+
+        function checkPermCodeUnique(permCode, callback) {
+            if (!permCode) {
+                callback(true);
+                return;
+            }
+            // 调用后台校验权限标识是否已存在。
+            checkUnique(MODULE_PATH + '/checkCode', {permCode: permCode}, callback);
+        }
+
+        function savePermission(data) {
+            let loading = layer.load();
+            // 按表单是否带权限 ID 决定新增或修改权限。
+            (data.field.permId ? putJson : postJson)(MODULE_PATH + (data.field.permId ? '/update' : '/add'), data.field, {
+                defaultMsg: '操作失败',
+                success: function (result) {
+                    layer.close(loading);
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                            layer.closeAll('page');
+                            render(queryWhere);
+                        });
+                    } else {
+                        layer.msg(result.msg || '操作失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    layer.close(loading);
+                }
+            });
+        }
+
+        form.on('submit(permission-save)', function (data) {
+            let permType = Number(data.field.permType);
+            // 目录可空码；菜单/按钮必须填写权限标识。
+            if ((permType === 1 || permType === 2) && !data.field.permCode) {
+                layer.msg('菜单或按钮权限标识不能为空', {icon: 2, time: 1000});
+                return false;
+            }
+            let originalParentId = $(data.form).find('[name="permName"]').attr('data-original-parent-id');
+            let originalPermName = $(data.form).find('[name="permName"]').attr('data-original-perm-name');
+            let originalPermCode = $(data.form).find('[name="permCode"]').attr('data-original-perm-code');
+            let nameUnchanged = data.field.permId && originalParentId === data.field.parentId && originalPermName === data.field.permName;
+            let codeUnchanged = data.field.permId && (originalPermCode || '') === (data.field.permCode || '');
+            let checkCodeAndSave = function () {
+                if (codeUnchanged || !data.field.permCode) {
+                    savePermission(data);
+                    return;
+                }
+                checkPermCodeUnique(data.field.permCode, function (unique) {
+                    if (unique) {
+                        savePermission(data);
+                    } else {
+                        layer.msg('权限标识已存在', {icon: 2, time: 1000});
+                    }
+                });
+            };
+            if (nameUnchanged) {
+                checkCodeAndSave();
+                return false;
+            }
+            checkPermNameUnique(data.field.parentId, data.field.permName, function (unique) {
+                if (unique) {
+                    checkCodeAndSave();
+                } else {
+                    layer.msg('同级权限名称已存在', {icon: 2, time: 1000});
+                }
+            });
+            return false;
+        });
+
+        function openPermissionForm(mode, row, parentId) {
+            loadParentPerms(function () {
+                currentPermissionLayerIndex = layer.open({
+                    type: 1,
+                    title: mode === 'add' ? '新增权限' : '修改权限',
+                    offset: mode === 'add' ? 'b' : 'r',
+                    anim: mode === 'add' ? 'slideUp' : 'slideLeft',
+                    shade: 0.1,
+                    shadeClose: true,
+                    id: mode === 'add' ? 'permission-add-layer' : 'permission-edit-layer',
+                    area: mode === 'add' ? ['900px', '78%'] : ['560px', '100%'],
+                    content: $('#permission-form').html(),
+                    success: function (layero) {
+                        let selectedParentId = mode === 'edit' && row ? row.parentId : parentId || '0';
+                        if (mode === 'edit' && row) {
+                            layero.find('[name="permName"]')
+                                .attr('data-original-parent-id', row.parentId)
+                                .attr('data-original-perm-name', row.permName);
+                            layero.find('[name="permCode"]').attr('data-original-perm-code', row.permCode || '');
+                            form.val('permission-form', {
+                                permId: row.permId,
+                                parentId: row.parentId,
+                                permName: row.permName,
+                                permCode: row.permCode,
+                                permUrl: row.permUrl,
+                                permDesc: row.permDesc,
+                                permIcon: row.permIcon,
+                                permType: String(row.permType != null ? row.permType : 0),
+                                isBlank: String(row.isBlank != null ? row.isBlank : 0),
+                                orderNum: row.orderNum,
+                                isEnabled: String(row.isEnabled != null ? row.isEnabled : 1)
+                            });
+                        } else {
+                            form.val('permission-form', {
+                                permId: '',
+                                parentId: selectedParentId,
+                                permName: '',
+                                permCode: '',
+                                permUrl: '',
+                                permDesc: '',
+                                permIcon: '',
+                                permType: '0',
+                                isBlank: '0',
+                                orderNum: 1,
+                                isEnabled: '0'
+                            });
+                        }
+                        bindParentDropdown(layero, selectedParentId);
+                        form.render();
+                    }
+                });
+            });
+        }
+
+        window.add = function () {
+            openPermissionForm('add', null, '0');
+        };
+
+        window.addChild = function (obj) {
+            openPermissionForm('add', null, obj.data.permId);
+        };
+
+        window.closeCurrentLayer = function () {
+            layer.close(currentPermissionLayerIndex);
+        };
+
+        window.edit = function (obj) {
+            openPermissionForm('edit', obj.data, null);
+        };
+
+        window.remove = function (obj) {
+            layer.confirm('确定要删除该权限吗？', {icon: 3, title: '提示'}, function (index) {
+                layer.close(index);
+                let loading = layer.load();
+                // 调用后台删除当前权限。
+                deleteJson(MODULE_PATH + '/delete', {ids: obj.data.permId}, {
+                    defaultMsg: '删除失败',
+                    success: function (result) {
+                        layer.close(loading);
+                        if (isAjaxSuccess(result)) {
+                            layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                                render(queryWhere);
+                            });
+                        } else {
+                            layer.msg(result.msg || '删除失败', {icon: 2, time: 1000});
+                        }
+                    },
+                    error: function () {
+                        layer.close(loading);
+                    }
+                });
+            });
+        };
+
+        window.batchRemove = function (obj) {
+            let ids = getCheckedFieldIds(obj, 'permId');
+            if (ids === '') {
+                layer.msg('未选中数据', {icon: 3, time: 1000});
+                return false;
+            }
+            layer.confirm('确定要删除这些权限吗？', {icon: 3, title: '提示'}, function (index) {
+                layer.close(index);
+                let loading = layer.load();
+                // 调用后台批量删除选中的权限。
+                deleteJson(MODULE_PATH + '/delete', {ids: ids}, {
+                    defaultMsg: '删除失败',
+                    success: function (result) {
+                        layer.close(loading);
+                        if (isAjaxSuccess(result)) {
+                            layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                                render(queryWhere);
+                            });
+                        } else {
+                            layer.msg(result.msg || '删除失败', {icon: 2, time: 1000});
+                        }
+                    },
+                    error: function () {
+                        layer.close(loading);
+                    }
+                });
+            });
+        };
+
+        window.refresh = function () {
+            render(queryWhere);
+        };
+    });
+</script>
+</body>
+</html>

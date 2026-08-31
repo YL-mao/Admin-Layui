@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sa="https://www.thymeleaf.org/extras/sa-token">
+<head th:replace="~{include :: header('系统配置')}"></head>
+    <style>
+        /* 配置维护：左右列等高，宽屏 30% / 70%。 */
+        #config-maintain-panel .config-maintain-row {
+            display: flex;
+            align-items: stretch;
+        }
+
+        #config-maintain-panel .config-maintain-col {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        #config-maintain-panel .config-maintain-search-card {
+            flex: 0 0 auto;
+        }
+
+        #config-maintain-panel .config-maintain-table-card {
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 0;
+        }
+
+        #config-maintain-panel .config-maintain-table-card > .layui-card-body {
+            flex: 1 1 auto;
+        }
+
+        @media screen and (min-width: 992px) {
+            #config-maintain-panel .config-maintain-col-left {
+                flex: 0 0 30%;
+                max-width: 30%;
+            }
+
+            #config-maintain-panel .config-maintain-col-right {
+                flex: 0 0 70%;
+                max-width: 70%;
+            }
+        }
+
+        /* 固定配置置顶；配置维护在下方留间距。 */
+        #config-fixed-panel {
+            margin-top: 0;
+            margin-bottom: 10px;
+            display: flex;
+            gap: 10px;
+            width: 100%;
+        }
+
+        #config-fixed-panel .config-fixed-lane {
+            flex: 1 1 0;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        #config-fixed-panel .config-accordion-wrap {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+
+        #config-fixed-panel .config-fixed-card {
+            width: 100%;
+            margin-bottom: 0;
+        }
+
+        @media screen and (max-width: 991px) {
+            #config-fixed-panel {
+                flex-direction: column;
+            }
+        }
+
+        #config-fixed-panel .config-fixed-collapse {
+            border: none;
+            background-color: #fff;
+        }
+
+        #config-fixed-panel .config-fixed-collapse .layui-colla-item {
+            border-top: none;
+        }
+
+        #config-fixed-panel .config-fixed-collapse .layui-colla-title,
+        #config-fixed-panel .config-fixed-collapse .layui-colla-content {
+            background-color: #fff;
+        }
+
+        #config-fixed-panel .config-fixed-collapse .layui-colla-content {
+            padding: 10px 12px 4px;
+        }
+
+        #config-fixed-panel .config-fixed-collapse .layui-form-label {
+            width: 96px;
+            text-align: right;
+            padding: 9px 15px;
+        }
+
+        #config-fixed-panel .config-fixed-collapse .layui-input-block {
+            margin-left: 126px;
+        }
+
+        #config-fixed-panel .config-fixed-collapse .layui-form-item {
+            margin-bottom: 12px;
+        }
+
+        #config-fixed-panel .config-fixed-collapse .layui-word-aux {
+            display: block;
+            float: none;
+            padding-left: 0 !important;
+        }
+
+        @media screen and (max-width: 768px) {
+            #config-fixed-panel .config-fixed-collapse .layui-form-label {
+                width: auto;
+                float: none;
+                display: block;
+                text-align: left;
+                padding: 8px 0 4px;
+            }
+
+            #config-fixed-panel .config-fixed-collapse .layui-input-block {
+                margin-left: 0;
+            }
+        }
+    </style>
+<body class="pear-container">
+<!-- 上半：基础配置（system 分组） -->
+<div id="config-fixed-panel">
+    <div class="config-fixed-lane">
+        <div sa:hasPermission="system:config:system" class="config-accordion-wrap">
+            <div class="layui-card config-fixed-card">
+                <div class="layui-collapse config-fixed-collapse" lay-filter="config-collapse-system">
+                    <div class="layui-colla-item">
+                        <div class="layui-colla-title">基础配置</div>
+                        <div class="layui-colla-content">
+                            <form class="layui-form config-group-form" lay-filter="config-group-system"></form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- 下半：配置维护常显 -->
+<div sa:hasPermission="system:config:maintain" id="config-maintain-panel">
+    <div class="layui-row layui-col-space10 config-maintain-row">
+        <div class="layui-col-md3 config-maintain-col config-maintain-col-left">
+            <div class="layui-card config-maintain-search-card">
+                <div class="layui-card-body">
+                    <form class="layui-form" lay-filter="config-group-query">
+                        <div class="layui-form-item">
+                            <div class="layui-inline">
+                                <label class="layui-form-label">配置分组</label>
+                                <div class="layui-input-inline">
+                                    <input type="text" name="configGroup" maxlength="50" placeholder="请输入配置分组" class="layui-input">
+                                </div>
+                            </div>
+                            <div class="layui-inline">
+                                <button class="pear-btn pear-btn-md pear-btn-primary" lay-submit lay-filter="config-group-query-submit">
+                                    <i class="layui-icon layui-icon-search"></i>
+                                    查询
+                                </button>
+                                <button type="reset" class="pear-btn pear-btn-md">
+                                    <i class="layui-icon layui-icon-refresh"></i>
+                                    重置
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="layui-card config-maintain-table-card">
+                <div class="layui-card-body">
+                    <table id="config-group-table" lay-filter="config-group-table"></table>
+                </div>
+            </div>
+        </div>
+        <div class="layui-col-md9 config-maintain-col config-maintain-col-right">
+            <div class="layui-card config-maintain-search-card">
+                <div class="layui-card-body">
+                    <form class="layui-form" lay-filter="config-maintain-query">
+                        <div class="layui-form-item">
+                            <div class="layui-inline">
+                                <label class="layui-form-label">配置名称</label>
+                                <div class="layui-input-inline">
+                                    <input type="text" name="configName" maxlength="100" placeholder="请输入配置名称" class="layui-input">
+                                </div>
+                            </div>
+                            <div class="layui-inline">
+                                <label class="layui-form-label">配置编码</label>
+                                <div class="layui-input-inline">
+                                    <input type="text" name="configCode" maxlength="100" placeholder="请输入配置编码" class="layui-input">
+                                </div>
+                            </div>
+                            <div class="layui-inline">
+                                <button class="pear-btn pear-btn-md pear-btn-primary" lay-submit lay-filter="config-maintain-query-submit">
+                                    <i class="layui-icon layui-icon-search"></i>
+                                    查询
+                                </button>
+                                <button type="reset" class="pear-btn pear-btn-md">
+                                    <i class="layui-icon layui-icon-refresh"></i>
+                                    重置
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="layui-card config-maintain-table-card">
+                <div class="layui-card-body">
+                    <table id="config-table" lay-filter="config-table"></table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+
+<script type="text/html" id="config-group-toolbar">
+    <button sa:hasPermission="system:config:insert" class="pear-btn pear-btn-primary pear-btn-md" lay-event="addGroup">
+        <i class="layui-icon layui-icon-add-1"></i>
+        新增分组
+    </button>
+</script>
+
+<script type="text/html" id="config-toolbar">
+    <button sa:hasPermission="system:config:insert" class="pear-btn pear-btn-primary pear-btn-md" lay-event="add">
+        <i class="layui-icon layui-icon-add-1"></i>
+        新增
+    </button>
+    <button sa:hasPermission="system:config:delete" class="pear-btn pear-btn-danger pear-btn-md" lay-event="batchRemove">
+        <i class="layui-icon layui-icon-delete"></i>
+        删除
+    </button>
+</script>
+
+<script type="text/html" id="config-bar" th:inline="none">
+    <button sa:hasPermission="system:config:update" class="pear-btn pear-btn-primary pear-btn-sm" lay-event="edit"><i class="layui-icon layui-icon-edit"></i></button>
+{{# if(d.isBuiltin != 1){ }}
+    <button sa:hasPermission="system:config:delete" class="pear-btn pear-btn-danger pear-btn-sm" lay-event="remove"><i class="layui-icon layui-icon-delete"></i></button>
+{{# } }}
+</script>
+
+<script type="text/html" id="config-enabled" th:inline="none">
+{{# if(d.isEnabled == 1){ }}
+    <input sa:hasPermission="system:config:updateEnabled" type="checkbox" value="{{d.configId}}" lay-skin="switch" lay-text="启用|停用" lay-filter="config-enable" checked>
+{{# } else { }}
+    <input sa:hasPermission="system:config:updateEnabled" type="checkbox" value="{{d.configId}}" lay-skin="switch" lay-text="启用|停用" lay-filter="config-enable">
+{{# } }}
+</script>
+
+<script type="text/html" id="config-builtin" th:inline="none">
+{{# if(d.isBuiltin == 1){ }}内置{{# } else { }}自定义{{# } }}
+</script>
+
+<script type="text/html" id="config-form">
+    <form class="layui-form" lay-filter="config-form">
+        <!-- 配置维护表单用于维护配置契约，内置配置会锁定编码、分组和值类型。 -->
+        <div class="mainBox">
+            <div class="main-container">
+                <input type="hidden" name="configId">
+                <div class="layui-form-item">
+                    <label class="layui-form-label">配置名称</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="configName" lay-verify="required" maxlength="100" placeholder="请输入配置名称" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">配置编码</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="configCode" lay-verify="required|configCodeFormat" maxlength="100" placeholder="请输入配置编码" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">配置分组</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="configGroup" lay-verify="required|configGroupFormat" maxlength="50" placeholder="请输入配置分组" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">值类型</label>
+                    <div class="layui-input-block">
+                        <select name="valueType" lay-verify="required">
+                            <option value="string">string</option>
+                            <option value="number">number</option>
+                            <option value="boolean">boolean</option>
+                            <option value="json">json</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">配置值</label>
+                    <div class="layui-input-block">
+                        <textarea name="configValue" maxlength="1000" placeholder="请输入配置值" class="layui-textarea"></textarea>
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">排序</label>
+                    <div class="layui-input-block">
+                        <input type="number" name="orderNum" lay-verify="required" placeholder="请输入排序" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">内置</label>
+                    <div class="layui-input-block">
+                        <input type="radio" name="isBuiltin" value="1" title="是">
+                        <input type="radio" name="isBuiltin" value="0" title="否" checked>
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">状态</label>
+                    <div class="layui-input-block">
+                        <input type="radio" name="isEnabled" value="1" title="启用">
+                        <input type="radio" name="isEnabled" value="0" title="停用" checked>
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">配置说明</label>
+                    <div class="layui-input-block">
+                        <textarea name="configDesc" maxlength="500" placeholder="请输入配置说明" class="layui-textarea"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="bottom">
+            <div class="button-container">
+                <button sa:hasPermissionOr="system:config:insert,system:config:update" type="submit" class="pear-btn pear-btn-primary pear-btn-sm" lay-submit lay-filter="config-save">
+                    <i class="layui-icon layui-icon-ok"></i>
+                    提交
+                </button>
+                <button type="button" class="pear-btn pear-btn-sm" onclick="window.closeCurrentLayer()">
+                    <i class="layui-icon layui-icon-close"></i>
+                    关闭
+                </button>
+            </div>
+        </div>
+    </form>
+</script>
+
+<th:block th:insert="~{include :: footer}"/>
+<script>
+    /* global layui, apiPath */
+    layui.use(['common', 'table', 'form', 'jquery', 'element'], function () {
+        let table = layui.table;
+        let form = layui.form;
+        let $ = layui.jquery;
+        let element = layui.element;
+        let MODULE_PATH = apiPath + '/config';
+        let currentGroup = '';
+        let currentLayerIndex = null;
+        let fixedGroupLoaded = {};
+        let FIXED_GROUPS = ['system'];
+
+        form.verify({
+            configCodeFormat: function (value) {
+                // 配置编码允许点号分层，便于表达 system.name 这类稳定契约。
+                if (value && !/^[A-Za-z0-9_.:-]+$/.test(value)) {
+                    return '配置编码只能包含字母、数字、下划线、中划线、冒号和点号';
+                }
+            },
+            configGroupFormat: function (value) {
+                if (value && !/^[A-Za-z0-9_-]+$/.test(value)) {
+                    return '配置分组只能包含字母、数字、下划线和中划线';
+                }
+            }
+        });
+
+        let configCols = [
+            [
+                {type: 'checkbox'},
+                {title: '配置名称', field: 'configName', align: 'center', minWidth: 120},
+                {title: '配置编码', field: 'configCode', align: 'center', minWidth: 180},
+                {title: '配置值', field: 'configValue', align: 'center', minWidth: 160},
+                {title: '值类型', field: 'valueType', align: 'center', width: 90},
+                {title: '内置', field: 'isBuiltin', align: 'center', templet: '#config-builtin', width: 90},
+                {title: '状态', field: 'isEnabled', align: 'center', templet: '#config-enabled', width: 110},
+                {title: '排序', field: 'orderNum', align: 'center', width: 80},
+                {title: '配置说明', field: 'configDesc', align: 'center', minWidth: 160},
+                {title: '操作', toolbar: '#config-bar', align: 'center', width: 130}
+            ]
+        ];
+
+        let groupCols = [
+            [
+                {title: '配置分组', field: 'configGroup', align: 'left'},
+                {title: '数量', field: 'configCount', align: 'left', width: 90}
+            ]
+        ];
+
+        renderMaintainTables();
+        initFixedGroupCollapses();
+
+        table.on('row(config-group-table)', function (obj) {
+            currentGroup = obj.data.configGroup;
+            obj.tr.addClass('layui-table-click').siblings().removeClass('layui-table-click');
+            reloadConfigTable();
+        });
+
+        table.on('toolbar(config-group-table)', function (obj) {
+            if (obj.event === 'addGroup') {
+                window.addGroup();
+            } else if (obj.event === 'refresh') {
+                table.reload('config-group-table', {where: form.val('config-group-query') || {}});
+            }
+        });
+
+        table.on('tool(config-table)', function (obj) {
+            if (obj.event === 'edit') {
+                window.editConfig(obj);
+            } else if (obj.event === 'remove') {
+                window.removeConfig(obj);
+            }
+        });
+
+        table.on('toolbar(config-table)', function (obj) {
+            if (obj.event === 'add') {
+                window.addConfig();
+            } else if (obj.event === 'refresh') {
+                reloadConfigTable();
+            } else if (obj.event === 'batchRemove') {
+                window.batchRemoveConfig();
+            }
+        });
+
+        form.on('submit(config-group-query-submit)', function (data) {
+            // 按分组名称筛选左侧分组列表。
+            table.reload('config-group-table', {where: data.field});
+            return false;
+        });
+
+        $('form[lay-filter="config-group-query"]').on('reset', function () {
+            setTimeout(function () {
+                form.render();
+                table.reload('config-group-table', {where: {}});
+            }, 0);
+        });
+
+        form.on('submit(config-maintain-query-submit)', function (data) {
+            reloadConfigTable(data.field);
+            return false;
+        });
+
+        $('form[lay-filter="config-maintain-query"]').on('reset', function () {
+            setTimeout(function () {
+                form.render();
+                reloadConfigTable();
+            }, 0);
+        });
+
+        form.on('switch(config-enable)', function (obj) {
+            updateConfigEnabled(obj);
+        });
+
+        form.on('submit(config-save)', function (data) {
+            saveConfig(data.field);
+            return false;
+        });
+
+        window.closeCurrentLayer = function () {
+            layer.close(currentLayerIndex);
+        };
+
+        window.addGroup = function () {
+            openConfigForm('add', {configGroup: '', orderNum: 1, isBuiltin: '0', isEnabled: '0', valueType: 'string'});
+        };
+
+        window.addConfig = function () {
+            openConfigForm('add', {configGroup: currentGroup, orderNum: 1, isBuiltin: '0', isEnabled: '0', valueType: 'string'});
+        };
+
+        window.editConfig = function (obj) {
+            openConfigForm('edit', obj.data);
+        };
+
+        window.removeConfig = function (obj) {
+            layer.confirm('确定要删除该配置吗？', {icon: 3, title: '提示'}, function (index) {
+                layer.close(index);
+                requestDelete(obj.data.configId, function () {
+                    obj.del();
+                    table.reload('config-group-table');
+                });
+            });
+        };
+
+        window.batchRemoveConfig = function () {
+            let checkData = table.checkStatus('config-table').data;
+            if (checkData.length === 0) {
+                layer.msg('请选择要删除的配置', {icon: 2, time: 1000});
+                return;
+            }
+            let ids = checkData.map(function (item) { return item.configId; }).join(',');
+            layer.confirm('确定要删除选中的配置吗？', {icon: 3, title: '提示'}, function (index) {
+                layer.close(index);
+                requestDelete(ids, function () {
+                    reloadConfigTable();
+                    table.reload('config-group-table');
+                });
+            });
+        };
+
+        function initFixedGroupCollapses() {
+            if ($('#config-fixed-panel').length === 0) {
+                return;
+            }
+            element.render('collapse');
+            // 页面加载时预取各分组配置，避免首次展开时内容为空导致过渡动画失效。
+            FIXED_GROUPS.forEach(function (group) {
+                if ($('[lay-filter="config-group-' + group + '"]').length === 0) {
+                    return;
+                }
+                fixedGroupLoaded[group] = true;
+                loadGroupConfig(group);
+            });
+        }
+
+        function reloadLoadedFixedGroups() {
+            FIXED_GROUPS.forEach(function (group) {
+                if (fixedGroupLoaded[group]) {
+                    loadGroupConfig(group);
+                }
+            });
+        }
+
+        function renderMaintainTables() {
+            if ($('#config-group-table').length === 0) {
+                return;
+            }
+            // 从后台聚合加载配置分组，左侧分组决定右侧维护列表的查询范围。
+            table.render({
+            response: TABLE_RESPONSE,
+                elem: '#config-group-table',
+                id: 'config-group-table',
+                url: MODULE_PATH + '/groups',
+                page: false,
+                cols: groupCols,
+                skin: 'line',
+                toolbar: '#config-group-toolbar',
+                defaultToolbar: [{
+                    title: '刷新',
+                    layEvent: 'refresh',
+                    icon: 'layui-icon-refresh'
+                }]
+            });
+
+            // 从后台分页加载配置维护列表，当前分组为空时展示全部配置。
+            table.render({
+            response: TABLE_RESPONSE,
+                elem: '#config-table',
+                id: 'config-table',
+                url: MODULE_PATH + '/list',
+                page: true,
+                cols: configCols,
+                skin: 'line',
+                toolbar: '#config-toolbar',
+                defaultToolbar: [{
+                    title: '刷新',
+                    layEvent: 'refresh',
+                    icon: 'layui-icon-refresh'
+                }, 'filter', 'print', 'exports'],
+                done: function () {
+                    form.render('checkbox');
+                }
+            });
+        }
+
+        function loadGroupConfig(group) {
+            // 按配置分组读取固定配置页表单项，后端会再次校验当前分组权限。
+            getJson(MODULE_PATH + '/group', {configGroup: group}, {
+                defaultMsg: '加载配置失败',
+                success: function (result) {
+                    if (isAjaxSuccess(result)) {
+                        renderGroupForm(group, result.data || []);
+                    } else {
+                        layer.msg(result.msg || '加载配置失败', {icon: 2, time: 1000});
+                    }
+                }
+            });
+        }
+
+        function renderGroupForm(group, configs) {
+            let $form = $('[lay-filter="config-group-' + group + '"]');
+            let html = [];
+            if (configs.length === 0) {
+                html.push('<div class="layui-form-item"><div class="layui-input-block">暂无可维护配置</div></div>');
+            }
+            configs.forEach(function (item) {
+                html.push(buildGroupField(item));
+            });
+            html.push('<div class="layui-form-item"><div class="layui-input-block"><button class="pear-btn pear-btn-primary" lay-submit lay-filter="config-group-save-' + group + '"><i class="layui-icon layui-icon-ok"></i> 保存</button></div></div>');
+            $form.html(html.join(''));
+            form.render();
+            form.on('submit(config-group-save-' + group + ')', function () {
+                saveGroupConfig(group);
+                return false;
+            });
+        }
+
+        function buildGroupField(item) {
+            let value = escapeHtml(item.configValue || '');
+            let code = escapeHtml(item.configCode);
+            let id = escapeHtml(item.configId);
+            let name = escapeHtml(item.configName);
+            if (item.valueType === 'boolean') {
+                let checked = item.configValue === 'true' ? ' checked' : '';
+                return '<div class="layui-form-item" data-config-id="' + id + '" data-config-code="' + code + '" data-value-type="boolean"><label class="layui-form-label">' + name + '</label><div class="layui-input-block"><input type="checkbox" lay-skin="switch" lay-text="开启|关闭"' + checked + '></div></div>';
+            }
+            if (item.valueType === 'json') {
+                return '<div class="layui-form-item" data-config-id="' + id + '" data-config-code="' + code + '" data-value-type="json"><label class="layui-form-label">' + name + '</label><div class="layui-input-block"><textarea maxlength="1000" class="layui-textarea">' + value + '</textarea></div></div>';
+            }
+            let inputType = item.valueType === 'number' ? 'number' : 'text';
+            return '<div class="layui-form-item" data-config-id="' + id + '" data-config-code="' + code + '" data-value-type="' + escapeHtml(item.valueType) + '"><label class="layui-form-label">' + name + '</label><div class="layui-input-block"><input type="' + inputType + '" maxlength="1000" value="' + value + '" class="layui-input"></div></div>';
+        }
+
+        function saveGroupConfig(group) {
+            let configs = [];
+            $('[lay-filter="config-group-' + group + '"] .layui-form-item[data-config-id]').each(function () {
+                let $item = $(this);
+                let valueType = $item.data('value-type');
+                let configValue = valueType === 'boolean' ? String($item.find('input[type="checkbox"]').prop('checked')) : $item.find('input,textarea,select').val();
+                configs.push({
+                    configId: $item.attr('data-config-id'),
+                    configCode: $item.attr('data-config-code'),
+                    configValue: configValue
+                });
+            });
+            let loading = layer.load();
+            // 固定配置页只批量保存当前分组的配置值，不修改配置编码、分组和值类型。
+            putJson(MODULE_PATH + '/updateGroup', {configGroup: group, configs: configs}, {
+                defaultMsg: '保存配置失败',
+                success: function (result) {
+                    layer.close(loading);
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg, {icon: 1, time: 1000});
+                    } else {
+                        layer.msg(result.msg || '保存配置失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    layer.close(loading);
+                }
+            });
+        }
+
+        function reloadConfigTable(extraWhere) {
+            let query = extraWhere || form.val('config-maintain-query') || {};
+            query.configGroup = currentGroup;
+            table.reload('config-table', {page: {curr: 1}, where: query});
+        }
+
+        function openConfigForm(mode, row) {
+            currentLayerIndex = layer.open({
+                type: 1,
+                title: mode === 'add' ? '新增系统配置' : '修改系统配置',
+                offset: mode === 'add' ? 'b' : 'r',
+                anim: mode === 'add' ? 'slideUp' : 'slideLeft',
+                area: mode === 'add' ? ['760px', '70%'] : ['560px', '100%'],
+                shade: 0.1,
+                shadeClose: true,
+                content: $('#config-form').html(),
+                success: function (layero) {
+                    form.render();
+                    let data = $.extend({
+                        configId: '',
+                        configName: '',
+                        configCode: '',
+                        configValue: '',
+                        configGroup: currentGroup,
+                        valueType: 'string',
+                        isBuiltin: '0',
+                        isEnabled: '0',
+                        orderNum: 1,
+                        configDesc: ''
+                    }, row || {});
+                    form.val('config-form', data);
+                    layero.find('[name="configCode"]').attr('data-original-code', data.configCode || '');
+                    layero.find('[lay-filter="config-form"]').attr('data-is-builtin', data.isBuiltin || 0);
+                    if (mode === 'edit' && data.isBuiltin == 1) {
+                        layero.find('[name="configCode"],[name="configGroup"]').prop('readonly', true);
+                        layero.find('[name="valueType"]').prop('disabled', true);
+                        form.render('select');
+                    }
+                }
+            });
+        }
+
+        function saveConfig(field) {
+            let $form = $('[lay-filter="config-form"]');
+            let originalCode = $form.find('[name="configCode"]').attr('data-original-code');
+            let isBuiltin = $form.attr('data-is-builtin') === '1';
+            if (isBuiltin) {
+                field.valueType = $form.find('[name="valueType"]').val();
+            }
+            if (field.configId && originalCode === field.configCode) {
+                doSaveConfig(field);
+                return;
+            }
+            checkConfigCodeUnique(field.configCode, function (unique) {
+                if (unique) {
+                    doSaveConfig(field);
+                } else {
+                    layer.msg('配置编码已存在', {icon: 2, time: 1000});
+                }
+            });
+        }
+
+        function checkConfigCodeUnique(configCode, callback) {
+            // 调用后台校验配置编码是否已经存在。
+            checkUnique(MODULE_PATH + '/checkCode', {configCode: configCode}, callback);
+        }
+
+        function doSaveConfig(field) {
+            let loading = layer.load();
+            // 按表单是否带配置 ID 决定新增或修改系统配置。
+            (field.configId ? putJson : postJson)(MODULE_PATH + (field.configId ? '/update' : '/add'), field, {
+                defaultMsg: '保存配置失败',
+                success: function (result) {
+                    layer.close(loading);
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                            layer.close(currentLayerIndex);
+                            table.reload('config-group-table');
+                            reloadConfigTable();
+                            reloadLoadedFixedGroups();
+                        });
+                    } else {
+                        layer.msg(result.msg || '保存配置失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    layer.close(loading);
+                }
+            });
+        }
+
+        function updateConfigEnabled(obj) {
+            // isEnabled 使用布尔语义，1 表示启用，0 表示停用。
+            patchJson(MODULE_PATH + '/updateEnabled', {
+                configId: obj.value,
+                isEnabled: obj.elem.checked ? 1 : 0
+            }, {
+                defaultMsg: '状态更新失败',
+                success: function (result) {
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg, {icon: 1, time: 1000});
+                    } else {
+                        obj.elem.checked = !obj.elem.checked;
+                        form.render('checkbox');
+                        layer.msg(result.msg || '状态更新失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    obj.elem.checked = !obj.elem.checked;
+                    form.render('checkbox');
+                }
+            });
+        }
+
+        function requestDelete(ids, callback) {
+            let loading = layer.load();
+            // 调用后台删除配置，内置配置会由 Service 拦截。
+            deleteJson(MODULE_PATH + '/delete', {ids: ids}, {
+                defaultMsg: '删除配置失败',
+                success: function (result) {
+                    layer.close(loading);
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg, {icon: 1, time: 1000}, callback);
+                    } else {
+                        layer.msg(result.msg || '删除配置失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    layer.close(loading);
+                }
+            });
+        }
+
+        function escapeHtml(value) {
+            return String(value === null || value === undefined ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+    });
+</script>
+</html>

@@ -1,0 +1,1356 @@
+<!DOCTYPE html>
+<html xmlns:sa="https://www.thymeleaf.org/extras/sa-token" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{include :: header('文件管理')}"></head>
+<body class="pear-container">
+<style>
+    /* 文件卡片墙：仅预览区；文件信息放在悬停遮罩上。 */
+    .file-card { margin-bottom: 0; }
+    /* 正方形预览区；图片 contain 不拉伸。 */
+    .file-card-preview {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        height: auto;
+        background: #f7f7f7;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
+    .file-card-preview img {
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+    }
+    .file-card-preview .file-card-icon {
+        font-size: 48px;
+        color: #c2c2c2;
+    }
+    /* 按上传场景区分预览占位图标颜色。 */
+    .file-card-preview .file-card-icon.is-image { color: #5FB878; }
+    .file-card-preview .file-card-icon.is-document { color: #1E9FFF; }
+    .file-card-preview .file-card-icon.is-excel { color: #FFB800; }
+    .file-card-check {
+        position: absolute;
+        top: 8px;
+        left: 10px;
+        z-index: 3;
+    }
+    /* 全幅灰色遮罩：上信息、下操作按钮。 */
+    .file-card-mask {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 10px 8px;
+        background: rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        pointer-events: none;
+        color: #fff;
+        text-align: center;
+    }
+    .file-card-preview:hover .file-card-mask {
+        opacity: 1;
+        pointer-events: auto;
+    }
+    .file-card-mask-info {
+        width: 100%;
+        padding: 0 4px;
+    }
+    .file-card-name {
+        font-size: 13px;
+        line-height: 18px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .file-card-meta {
+        margin-top: 4px;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.85);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .file-card-mask-actions {
+        display: flex;
+        justify-content: center;
+        flex-wrap: nowrap;
+        gap: 6px;
+    }
+    /* 悬停条用图标按钮，避免三字文案在窄卡片上折成三角。 */
+    .file-card-mask-actions .file-card-act {
+        padding: 0 8px;
+        min-width: 28px;
+    }
+    .file-card-empty {
+        padding: 48px 0;
+        text-align: center;
+        color: #999;
+    }
+    #file-page { margin-top: 12px; text-align: center; }
+    /* 仅上传配置抽屉加宽标签；短表单沿用 Layui 默认，避免内容被挤到右侧。 */
+    .file-config-drawer .layui-form-label {
+        width: 110px;
+        white-space: nowrap;
+    }
+    .file-config-drawer .layui-input-block {
+        margin-left: 140px;
+    }
+    /*
+     * 左侧通高：与部门树同款，高度写在树上撑开白色卡片。
+     * 目录增改删改用节点右侧内置图标，无顶部工具条。
+     */
+    #folderTree {
+        width: 100% !important;
+        height: -webkit-calc(100vh - 130px);
+        height: -moz-calc(100vh - 130px);
+        height: calc(100vh - 130px);
+        overflow: auto;
+    }
+</style>
+<div class="layui-row layui-col-space15">
+    <div class="layui-col-md3">
+        <div class="layui-card">
+            <!-- 上传配置入口放在左侧目录栏头部。 -->
+            <div class="layui-card-header" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                <span>目录</span>
+                <button sa:hasPermission="system:config:upload" type="button" class="pear-btn pear-btn-md" id="btn-upload-config">
+                    <i class="layui-icon layui-icon-set"></i> 上传配置
+                </button>
+            </div>
+            <div class="layui-card-body">
+                <!-- 权限标记：供树节点内置 edit 图标按权限裁剪。 -->
+                <span id="perm-folder-insert" sa:hasPermission="system:file:folderInsert" style="display:none;"></span>
+                <span id="perm-folder-update" sa:hasPermission="system:file:folderUpdate" style="display:none;"></span>
+                <span id="perm-folder-delete" sa:hasPermission="system:file:folderDelete" style="display:none;"></span>
+                <div id="folderTree"></div>
+            </div>
+        </div>
+    </div>
+    <div class="layui-col-md9">
+        <div class="layui-card">
+            <div class="layui-card-body">
+                <form class="layui-form" action="" lay-filter="file-query-form">
+                    <div class="layui-form-item layui-inline">
+                        <label class="layui-form-label">文件名</label>
+                        <div class="layui-input-inline">
+                            <input type="text" name="originalName" placeholder="请输入文件名" class="layui-input" maxlength="255">
+                        </div>
+                    </div>
+                    <div class="layui-form-item layui-inline">
+                        <button class="pear-btn pear-btn-md pear-btn-primary" lay-submit lay-filter="file-query">
+                            <i class="layui-icon layui-icon-search"></i> 查询
+                        </button>
+                        <button type="reset" class="pear-btn pear-btn-md">重置</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <div class="layui-card">
+            <div class="layui-card-header">
+                <button sa:hasPermission="system:file:select" type="button" class="pear-btn pear-btn-primary pear-btn-md" id="btn-file-upload">
+                    <i class="layui-icon layui-icon-upload"></i> 上传
+                </button>
+                <button sa:hasPermission="system:file:delete" type="button" class="pear-btn pear-btn-danger pear-btn-md" id="btn-file-batch-remove">
+                    <i class="layui-icon layui-icon-delete"></i> 删除
+                </button>
+                <button type="button" class="pear-btn pear-btn-md" id="btn-file-refresh">
+                    <i class="layui-icon layui-icon-refresh"></i> 刷新
+                </button>
+            </div>
+            <div class="layui-card-body">
+                <div id="file-card-list" class="layui-row layui-col-space15"></div>
+                <div id="file-page"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 权限裁剪后的操作按钮 HTML，注入到卡片悬停条。 -->
+<script type="text/html" id="file-card-actions-tpl">
+    <button sa:hasPermission="system:file:select" type="button" class="layui-btn layui-btn-xs file-card-act" data-event="detail" title="详情">
+        <i class="layui-icon layui-icon-about"></i>
+    </button>
+    <button sa:hasPermission="system:file:update" type="button" class="layui-btn layui-btn-xs layui-btn-normal file-card-act" data-event="overwrite" title="覆盖">
+        <i class="layui-icon layui-icon-upload"></i>
+    </button>
+    <button sa:hasPermission="system:file:delete" type="button" class="layui-btn layui-btn-xs layui-btn-danger file-card-act" data-event="remove" title="删除">
+        <i class="layui-icon layui-icon-delete"></i>
+    </button>
+</script>
+
+<div class="folder-form-modal" id="folder-form" style="display:none;">
+    <form class="layui-form" lay-filter="folder-form">
+        <div class="mainBox">
+            <div class="main-container">
+                <input type="hidden" name="folderId">
+                <div class="layui-form-item">
+                    <label class="layui-form-label">上级目录</label>
+                    <div class="layui-input-block">
+                        <input type="hidden" name="parentId" value="0">
+                        <input type="text" name="parentName" class="layui-input layui-folder-parent-input" readonly
+                               placeholder="点击选择上级目录" autocomplete="off">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">目录名称</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="folderName" lay-verify="required" maxlength="100" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">排序</label>
+                    <div class="layui-input-block">
+                        <input type="number" name="orderNum" value="1" lay-verify="required|number" class="layui-input">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="bottom">
+            <div class="button-container">
+                <button class="pear-btn pear-btn-primary pear-btn-sm" lay-submit lay-filter="folder-save">
+                    <i class="layui-icon layui-icon-ok"></i>
+                    保存
+                </button>
+                <button type="button" class="pear-btn pear-btn-sm" onclick="closeCurrentLayer()">
+                    <i class="layui-icon layui-icon-close"></i>
+                    关闭
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="file-form-modal" id="file-detail-form" style="display:none;">
+    <form class="layui-form" lay-filter="file-detail-form">
+        <div class="mainBox">
+            <div class="main-container">
+                <input type="hidden" name="fileId">
+                <div class="layui-form-item">
+                    <label class="layui-form-label">文件名</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="originalName" lay-verify="required" maxlength="255" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">需登录</label>
+                    <div class="layui-input-block">
+                        <input type="radio" name="needLogin" value="1" title="是" checked>
+                        <input type="radio" name="needLogin" value="0" title="否">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">所属目录</label>
+                    <div class="layui-input-block">
+                        <!-- 可改时用下拉树移动目录；只读时展示目录名。 -->
+                        <input type="hidden" name="folderId">
+                        <input type="text" name="folderName" class="layui-input layui-file-folder-input" readonly
+                               placeholder="点击选择目录" autocomplete="off">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">上传场景</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="fileSceneText" disabled class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">后缀</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="fileSuffix" disabled class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">类型</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="contentType" disabled class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">大小</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="fileSizeText" disabled class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">存储方式</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="storageType" disabled class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">访问地址</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="accessUrl" disabled class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">上传时间</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="createTimeText" disabled class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">文件ID</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="fileIdText" disabled class="layui-input">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="bottom">
+            <div class="button-container">
+                <button sa:hasPermission="system:file:update" type="submit" class="pear-btn pear-btn-primary pear-btn-sm"
+                        lay-submit lay-filter="file-detail-save">
+                    <i class="layui-icon layui-icon-ok"></i>
+                    保存
+                </button>
+                <button type="button" class="pear-btn pear-btn-sm" onclick="closeCurrentLayer()">
+                    <i class="layui-icon layui-icon-close"></i>
+                    关闭
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="file-form-modal" id="file-upload-form" style="display:none;">
+    <form class="layui-form" lay-filter="file-upload-form">
+        <div class="mainBox">
+            <div class="main-container">
+                <div class="layui-form-item">
+                    <label class="layui-form-label">当前目录</label>
+                    <div class="layui-input-block">
+                        <input type="text" id="file-upload-folder-name" class="layui-input" readonly>
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">上传场景</label>
+                    <div class="layui-input-block">
+                        <select name="fileScene" lay-filter="file-upload-scene">
+                            <option value="image" selected>图片</option>
+                            <option value="document">文档</option>
+                            <option value="excel">表格</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">需登录</label>
+                    <div class="layui-input-block">
+                        <input type="radio" name="needLogin" value="1" title="是" checked>
+                        <input type="radio" name="needLogin" value="0" title="否">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">选择文件</label>
+                    <div class="layui-input-block">
+                        <button type="button" class="layui-btn layui-btn-normal" id="file-upload-btn">选择文件</button>
+                        <div class="layui-word-aux" id="file-upload-ext-tip" style="margin-top:8px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="bottom">
+            <div class="button-container">
+                <button type="button" class="pear-btn pear-btn-sm" onclick="closeCurrentLayer()">
+                    <i class="layui-icon layui-icon-close"></i>
+                    关闭
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="file-form-modal" id="file-overwrite-form" style="display:none;">
+    <form class="layui-form" action="">
+        <div class="mainBox">
+            <div class="main-container">
+                <div class="layui-form-item">
+                    <label class="layui-form-label">选择文件</label>
+                    <div class="layui-input-block">
+                        <button type="button" class="layui-btn layui-btn-normal" id="file-overwrite-btn">选择文件</button>
+                        <div class="layui-word-aux" id="file-overwrite-ext-tip" style="margin-top:8px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="bottom">
+            <div class="button-container">
+                <button type="button" class="pear-btn pear-btn-sm" onclick="closeCurrentLayer()">
+                    <i class="layui-icon layui-icon-close"></i>
+                    关闭
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="file-form-modal file-config-drawer" id="file-upload-config-modal" style="display:none;">
+    <form class="layui-form" lay-filter="file-upload-config-form" action="">
+        <div class="mainBox">
+            <div class="main-container" id="file-upload-config-fields"></div>
+        </div>
+        <div class="bottom">
+            <div class="button-container">
+                <button type="submit" class="pear-btn pear-btn-primary pear-btn-sm" lay-submit=""
+                        lay-filter="file-upload-config-save">
+                    <i class="layui-icon layui-icon-ok"></i>
+                    提交
+                </button>
+                <button type="button" class="pear-btn pear-btn-sm" onclick="closeCurrentLayer()">
+                    <i class="layui-icon layui-icon-close"></i>
+                    关闭
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<th:block th:replace="~{include :: footer}"/>
+<script th:src="@{/static/admin/js/dept-util.js}"></script>
+<script>
+    /* global layui, apiPath, buildDeptTree, getJson, postJson, putJson, deleteJson, isAjaxSuccess, getAjaxErrorMsg, initDeptDropdownSelect */
+    layui.use(['form', 'tree', 'jquery', 'upload', 'layer', 'laypage'], function () {
+        let form = layui.form;
+        let tree = layui.tree;
+        let upload = layui.upload;
+        let layer = layui.layer;
+        let laypage = layui.laypage;
+        let $ = layui.jquery;
+        let FILE_PATH = apiPath + '/file';
+        let FOLDER_PATH = apiPath + '/folder';
+        let CONFIG_PATH = apiPath + '/config';
+        // 默认选中虚拟根，便于在根下新建一级目录（与「未分类」平级）。
+        let currentFolderId = '0';
+        let folderFlat = [];
+        let fileRows = [];
+        let queryOriginalName = '';
+        let pageNum = 1;
+        let pageLimit = 18;
+        let pageCount = 0;
+        let uploadRules = null;
+        // 读取权限裁剪后的按钮；若为空则回退三项，避免卡片无法操作。
+        let cardActionsHtml = $('#file-card-actions-tpl').html() || '';
+        if (!$.trim(cardActionsHtml)) {
+            cardActionsHtml = ''
+                + '<button type="button" class="layui-btn layui-btn-xs file-card-act" data-event="detail" title="详情"><i class="layui-icon layui-icon-about"></i></button>'
+                + '<button type="button" class="layui-btn layui-btn-xs layui-btn-normal file-card-act" data-event="overwrite" title="覆盖"><i class="layui-icon layui-icon-upload"></i></button>'
+                + '<button type="button" class="layui-btn layui-btn-xs layui-btn-danger file-card-act" data-event="remove" title="删除"><i class="layui-icon layui-icon-delete"></i></button>';
+        }
+
+        function extensionsForScene(scene) {
+            if (!uploadRules) {
+                return [];
+            }
+            if (scene === 'document') {
+                return uploadRules.documentExtensions || [];
+            }
+            if (scene === 'excel') {
+                return uploadRules.excelExtensions || [];
+            }
+            return uploadRules.imageExtensions || [];
+        }
+
+        function buildExts(scene) {
+            return extensionsForScene(scene).join('|');
+        }
+
+        function buildAcceptMime(scene) {
+            let exts = extensionsForScene(scene);
+            if (!exts.length) {
+                return '';
+            }
+            if (scene === 'image') {
+                return exts.map(function (ext) {
+                    if (ext === 'jpg' || ext === 'jpeg') {
+                        return 'image/jpeg';
+                    }
+                    if (ext === 'png') {
+                        return 'image/png';
+                    }
+                    if (ext === 'gif') {
+                        return 'image/gif';
+                    }
+                    if (ext === 'webp') {
+                        return 'image/webp';
+                    }
+                    return 'image/' + ext;
+                }).filter(function (v, i, arr) {
+                    return arr.indexOf(v) === i;
+                }).join(',');
+            }
+            // 文档/表格以后缀校验为主，选择器仍尽量按 MIME 收窄。
+            return exts.map(function (ext) { return '.' + ext; }).join(',');
+        }
+
+        function updateUploadExtTip(scene) {
+            let exts = extensionsForScene(scene);
+            let maxMb = uploadRules && uploadRules.maxFileSizeMb ? uploadRules.maxFileSizeMb : '';
+            let tip = exts.length ? ('允许：' + exts.join('、')) : '';
+            if (maxMb) {
+                tip += (tip ? '；' : '') + '单文件最大 ' + maxMb + 'MB';
+            }
+            $('#file-upload-ext-tip').text(tip);
+        }
+
+        /** 解析 Layui upload error 回调中的业务错误文案（参数顺序：index, upload, res, xhr）。 */
+        function resolveUploadErrorMsg(res, xhr, defaultMsg) {
+            if (xhr) {
+                return getAjaxErrorMsg(xhr, defaultMsg);
+            }
+            if (res) {
+                try {
+                    let parsed = typeof res === 'string' ? JSON.parse(res) : res;
+                    if (parsed && parsed.msg) {
+                        return parsed.msg;
+                    }
+                } catch (e) {
+                    // 非 JSON 时回退默认文案。
+                }
+            }
+            return defaultMsg;
+        }
+
+        function loadUploadRules(done) {
+            // 加载上传规则；开关关闭时后端拒绝，回调 ok=false，禁止打开上传入口。
+            getJson(FILE_PATH + '/uploadRules', null, {
+                defaultMsg: '加载上传规则失败',
+                success: function (result) {
+                    if (isAjaxSuccess(result) && result.data) {
+                        uploadRules = result.data;
+                        if (typeof done === 'function') {
+                            done(true);
+                        }
+                        return;
+                    }
+                    uploadRules = null;
+                    layer.msg((result && result.msg) || '加载上传规则失败', {icon: 2, time: 1500});
+                    if (typeof done === 'function') {
+                        done(false);
+                    }
+                },
+                error: function () {
+                    uploadRules = null;
+                    if (typeof done === 'function') {
+                        done(false);
+                    }
+                }
+            });
+        }
+
+        function escapeHtml(text) {
+            return String(text == null ? '' : text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function formatFileSize(size) {
+            let n = Number(size) || 0;
+            if (n < 1024) {
+                return n + ' B';
+            }
+            if (n < 1024 * 1024) {
+                return (n / 1024).toFixed(1) + ' KB';
+            }
+            return (n / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function isImageFile(row) {
+            let suffix = String(row.fileSuffix || '').toLowerCase().replace(/^\./, '');
+            let contentType = String(row.contentType || '').toLowerCase();
+            return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].indexOf(suffix) >= 0
+                || contentType.indexOf('image/') === 0;
+        }
+
+        /** 非图片卡片预览：按场景选用 Layui 图标。 */
+        function fileTypeIconClass(row) {
+            let scene = String((row && row.fileScene) || '').toLowerCase();
+            if (scene === 'excel') {
+                return 'layui-icon-table is-excel';
+            }
+            if (scene === 'document') {
+                return 'layui-icon-read is-document';
+            }
+            if (scene === 'image' || isImageFile(row)) {
+                return 'layui-icon-picture is-image';
+            }
+            return 'layui-icon-file';
+        }
+
+        function toDeptShape(list) {
+            return (list || []).map(function (item) {
+                return {deptId: item.folderId, parentId: item.parentId, deptName: item.folderName};
+            });
+        }
+
+        function getFolderName(folderId) {
+            if (!folderId || folderId === '0') {
+                return '根目录';
+            }
+            let folder = folderFlat.find(function (f) { return f.folderId === folderId; });
+            return folder ? folder.folderName : '根目录';
+        }
+
+        function findFolder(folderId) {
+            return folderFlat.find(function (f) { return String(f.folderId) === String(folderId); });
+        }
+
+        /** 根目录与内置「未分类」不可改删。 */
+        function canMutateFolder(folderId) {
+            if (!folderId || folderId === '0') {
+                return false;
+            }
+            let folder = findFolder(folderId);
+            return !!(folder && folder.isBuiltin != 1);
+        }
+
+        function fileListWhere() {
+            // 根目录下列出全部文件；具体目录只看该目录。
+            let where = {};
+            if (currentFolderId && currentFolderId !== '0') {
+                where.folderId = currentFolderId;
+            }
+            if (queryOriginalName) {
+                where.originalName = queryOriginalName;
+            }
+            return where;
+        }
+
+        function findFileRow(fileId) {
+            return fileRows.find(function (row) { return String(row.fileId) === String(fileId); });
+        }
+
+        function renderFileCards(list) {
+            let $list = $('#file-card-list');
+            $list.empty();
+            if (!list || !list.length) {
+                $list.html('<div class="layui-col-md12"><div class="file-card-empty">暂无文件</div></div>');
+                return;
+            }
+            let html = '';
+            list.forEach(function (row) {
+                let name = escapeHtml(row.originalName);
+                let fileId = escapeHtml(row.fileId);
+                let preview;
+                if (isImageFile(row) && row.accessUrl) {
+                    preview = '<img src="' + escapeHtml(row.accessUrl) + '" alt="' + name + '" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'inline-block\';">'
+                        + '<i class="layui-icon layui-icon-picture is-image file-card-icon" style="display:none;"></i>';
+                } else {
+                    preview = '<i class="layui-icon ' + fileTypeIconClass(row) + ' file-card-icon"></i>';
+                }
+                html += '<div class="layui-col-md2 layui-col-sm4 layui-col-xs6">'
+                    + '<div class="layui-card file-card" data-file-id="' + fileId + '">'
+                    + '<div class="file-card-preview">'
+                    + '<input type="checkbox" class="file-card-check" value="' + fileId + '">'
+                    + preview
+                    + '<div class="file-card-mask">'
+                    + '<div class="file-card-mask-info">'
+                    + '<div class="file-card-name" title="' + name + '">' + name + '</div>'
+                    + '<div class="file-card-meta">' + escapeHtml(formatFileSize(row.fileSize))
+                    + ' · ' + (row.needLogin === 1 ? '需登录' : '公开')
+                    + ' · ' + escapeHtml(row.fileScene || '-') + '</div>'
+                    + '</div>'
+                    + '<div class="file-card-mask-actions">' + cardActionsHtml + '</div>'
+                    + '</div>'
+                    + '</div></div></div>';
+            });
+            $list.html(html);
+        }
+
+        function renderPager() {
+            // 官方 laypage：count/curr/limit + jump。
+            laypage.render({
+                elem: 'file-page',
+                count: pageCount,
+                curr: pageNum,
+                limit: pageLimit,
+                limits: [18, 36, 54],
+                layout: ['count', 'prev', 'page', 'next', 'limit'],
+                jump: function (obj, first) {
+                    if (first) {
+                        return;
+                    }
+                    pageNum = obj.curr;
+                    pageLimit = obj.limit;
+                    loadFileCards(false);
+                }
+            });
+        }
+
+        function loadFileCards(resetPage) {
+            if (resetPage) {
+                pageNum = 1;
+            }
+            let params = Object.assign({page: pageNum, limit: pageLimit}, fileListWhere());
+            // 加载文件卡片列表。
+            getJson(FILE_PATH + '/list', params, {
+                defaultMsg: '加载文件失败',
+                success: function (result) {
+                    if (!isAjaxSuccess(result)) {
+                        layer.msg(result.msg || '加载文件失败', {icon: 2, time: 1000});
+                        return;
+                    }
+                    fileRows = result.data || [];
+                    pageCount = result.count || 0;
+                    renderFileCards(fileRows);
+                    renderPager();
+                }
+            });
+        }
+
+        function reloadFileList(resetPage) {
+            loadFileCards(resetPage !== false);
+        }
+
+        function reloadTree() {
+            // 按权限组装节点右侧内置操作图标。
+            let folderEdit = [];
+            if ($('#perm-folder-insert').length) {
+                folderEdit.push('add');
+            }
+            if ($('#perm-folder-update').length) {
+                folderEdit.push('update');
+            }
+            if ($('#perm-folder-delete').length) {
+                folderEdit.push('del');
+            }
+            // 加载虚拟目录树。
+            getJson(FOLDER_PATH + '/tree', null, {
+                defaultMsg: '加载目录失败',
+                success: function (result) {
+                    if (!isAjaxSuccess(result)) {
+                        layer.msg(result.msg || '加载目录失败', {icon: 2, time: 1000});
+                        return;
+                    }
+                    folderFlat = result.data || [];
+                    let children = buildDeptTree(toDeptShape(folderFlat), '0', 0);
+                    // 增加可选的虚拟根，用于新建一级目录。
+                    tree.render({
+                        elem: '#folderTree',
+                        data: [{id: '0', title: '根目录', spread: true, children: children}],
+                        showLine: true,
+                        onlyIconControl: true,
+                        // Layui 内置节点操作：加号 / 改 / 删除（改图标由下方拦截为抽屉）。
+                        edit: folderEdit.length ? folderEdit : false,
+                        click: function (obj) {
+                            currentFolderId = obj.data.id;
+                            reloadFileList(true);
+                        },
+                        operate: function (obj) {
+                            let type = obj.type;
+                            let nodeId = String(obj.data.id);
+                            if (type === 'add') {
+                                // 在当前节点下新增；Layui 会先插临时节点，表单关闭后整树重载。
+                                currentFolderId = nodeId;
+                                openFolderForm('add', null);
+                                return 'tmp-' + Date.now();
+                            }
+                            if (type === 'update') {
+                                // 改图标已拦截为抽屉；此处若仍触发则忽略行内改名。
+                                return;
+                            }
+                            if (type === 'del') {
+                                // Layui 已弹确认；此处校验内置后调删除接口，失败则重载还原。
+                                if (!canMutateFolder(nodeId)) {
+                                    layer.msg('根目录与内置目录不可删除', {icon: 0, time: 1500});
+                                    reloadTree();
+                                    return;
+                                }
+                                deleteJson(FOLDER_PATH + '/delete', {ids: nodeId}, {
+                                    defaultMsg: '删除目录失败',
+                                    success: function (result) {
+                                        if (isAjaxSuccess(result)) {
+                                            layer.msg(result.msg, {icon: 1, time: 1000});
+                                            if (String(currentFolderId) === nodeId) {
+                                                currentFolderId = '0';
+                                            }
+                                            reloadTree();
+                                            reloadFileList(true);
+                                        } else {
+                                            layer.msg(result.msg || '删除目录失败', {icon: 2, time: 1000});
+                                            reloadTree();
+                                        }
+                                    },
+                                    error: function () {
+                                        reloadTree();
+                                    }
+                                });
+                            }
+                        }
+                    });
+                    // 拦截「改」图标：阻止行内改名，改为打开修改抽屉。
+                    bindFolderEditIcons();
+                }
+            });
+        }
+
+        /** 节点铅笔图标 → 修改目录抽屉（不用 Layui 默认行内改名）。 */
+        function bindFolderEditIcons() {
+            $('#folderTree').find('.layui-tree-btnGroup .layui-icon-edit')
+                .off('click.folderEdit')
+                .on('click.folderEdit', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    let nodeId = String($(this).closest('.layui-tree-set').attr('data-id') || '');
+                    if (!canMutateFolder(nodeId)) {
+                        layer.msg('根目录与内置目录不可修改', {icon: 0, time: 1500});
+                        return false;
+                    }
+                    let folder = findFolder(nodeId);
+                    if (!folder) {
+                        layer.msg('目录不存在', {icon: 2, time: 1000});
+                        return false;
+                    }
+                    currentFolderId = nodeId;
+                    openFolderForm('edit', folder);
+                    return false;
+                });
+        }
+
+        form.on('submit(file-query)', function (data) {
+            queryOriginalName = (data.field.originalName || '').trim();
+            reloadFileList(true);
+            return false;
+        });
+
+        // 切换上传场景时，按配置刷新后缀限制。
+        form.on('select(file-upload-scene)', function () {
+            if (typeof window.__rebindFileUploader === 'function') {
+                window.__rebindFileUploader();
+            }
+        });
+
+        $('#btn-file-upload').on('click', function () { openUpload(); });
+        $('#btn-file-refresh').on('click', function () { reloadFileList(false); });
+        $('#btn-upload-config').on('click', function () { openUploadConfig(); });
+        $('#btn-file-batch-remove').on('click', function () {
+            let ids = [];
+            $('#file-card-list .file-card-check:checked').each(function () {
+                ids.push($(this).val());
+            });
+            if (!ids.length) {
+                layer.msg('请选择要删除的文件', {icon: 2, time: 1000});
+                return;
+            }
+            removeFiles(ids.join(','));
+        });
+
+        // 卡片悬停条上的操作按钮。
+        $(document).on('click', '.file-card-act', function () {
+            let eventName = $(this).data('event');
+            let fileId = $(this).closest('.file-card').data('file-id');
+            let row = findFileRow(fileId);
+            if (!row) {
+                return;
+            }
+            if (eventName === 'detail') {
+                openFileDetail(row);
+            } else if (eventName === 'overwrite') {
+                openOverwrite(row.fileId);
+            } else if (eventName === 'remove') {
+                removeFiles(row.fileId);
+            }
+        });
+
+        function openFolderForm(mode, folder) {
+            let parentId = mode === 'add' ? (currentFolderId || '0') : (folder.parentId || '0');
+            let folderSaved = false;
+            form.val('folder-form', {
+                folderId: mode === 'edit' ? folder.folderId : '',
+                parentId: parentId,
+                parentName: getFolderName(parentId),
+                folderName: mode === 'edit' ? (folder.folderName || '') : '',
+                orderNum: mode === 'edit' ? (folder.orderNum == null ? 1 : folder.orderNum) : 1
+            });
+            layer.open({
+                type: 1,
+                title: mode === 'edit' ? '修改目录' : '新增目录',
+                offset: 'l',
+                anim: 'slideRight',
+                // 仅 3 项，用短抽屉；字段多时才通高。
+                area: ['420px', '42%'],
+                shade: 0.1,
+                shadeClose: true,
+                content: $('#folder-form'),
+                success: function () {
+                    form.render();
+                    // 上级目录可选根或任意已有目录；编辑时排除自身，避免选到自己。
+                    let parentSource = folderFlat;
+                    if (mode === 'edit' && folder) {
+                        parentSource = folderFlat.filter(function (f) {
+                            return String(f.folderId) !== String(folder.folderId);
+                        });
+                    }
+                    let parentList = [{deptId: '0', parentId: '-1', deptName: '根目录'}].concat(toDeptShape(parentSource));
+                    initDeptDropdownSelect({
+                        container: '#folder-form',
+                        list: parentList,
+                        hiddenName: 'parentId',
+                        inputSelector: '.layui-folder-parent-input',
+                        value: parentId,
+                        rootParentId: '-1'
+                    });
+                },
+                end: function () {
+                    // 取消新增时清掉 Layui 临时插入的「未命名」节点。
+                    if (mode === 'add' && !folderSaved) {
+                        reloadTree();
+                    }
+                }
+            });
+            // 供保存成功标记，避免 end 里重复无意义重载前已 reload。
+            window.__markFolderSaved = function () {
+                folderSaved = true;
+            };
+        }
+
+        form.on('submit(folder-save)', function (data) {
+            delete data.field.parentName;
+            let folderId = data.field.folderId;
+            let isEdit = !!folderId;
+            // 新增或修改虚拟目录。
+            (isEdit ? putJson : postJson)(FOLDER_PATH + (isEdit ? '/update' : '/add'), data.field, {
+                defaultMsg: isEdit ? '修改目录失败' : '保存目录失败',
+                success: function (result) {
+                    if (isAjaxSuccess(result)) {
+                        if (typeof window.__markFolderSaved === 'function') {
+                            window.__markFolderSaved();
+                        }
+                        layer.closeAll();
+                        layer.msg(result.msg, {icon: 1, time: 1000});
+                        reloadTree();
+                    } else {
+                        layer.msg(result.msg || (isEdit ? '修改目录失败' : '保存目录失败'), {icon: 2, time: 1000});
+                    }
+                }
+            });
+            return false;
+        });
+
+        function sceneText(scene) {
+            if (scene === 'document') {
+                return '文档';
+            }
+            if (scene === 'excel') {
+                return '表格';
+            }
+            if (scene === 'image') {
+                return '图片';
+            }
+            return scene || '-';
+        }
+
+        function openFileDetail(row) {
+            // 展示完整信息；可改文件名、需登录、所属目录（移动）。
+            form.val('file-detail-form', {
+                fileId: row.fileId || '',
+                folderId: row.folderId || '',
+                originalName: row.originalName || '',
+                needLogin: String(row.needLogin == null ? 1 : row.needLogin),
+                folderName: getFolderName(row.folderId),
+                fileSceneText: sceneText(row.fileScene),
+                fileSuffix: row.fileSuffix || '',
+                contentType: row.contentType || '',
+                fileSizeText: formatFileSize(row.fileSize),
+                storageType: row.storageType || '',
+                accessUrl: row.accessUrl || '',
+                createTimeText: row.createTime || '',
+                fileIdText: row.fileId || ''
+            });
+            let canUpdate = $('#file-detail-form [lay-filter="file-detail-save"]').length > 0;
+            // 无修改权限时，可改字段也改为 disabled，走 Layui 灰底禁用样式。
+            $('#file-detail-form [name="originalName"]').prop('disabled', !canUpdate);
+            $('#file-detail-form [name="needLogin"]').prop('disabled', !canUpdate);
+            $('#file-detail-form .layui-file-folder-input').prop('disabled', !canUpdate);
+            layer.open({
+                type: 1,
+                title: '文件详情',
+                offset: 'r',
+                anim: 'slideLeft',
+                area: ['460px', '100%'],
+                shade: 0.1,
+                shadeClose: true,
+                content: $('#file-detail-form'),
+                success: function () {
+                    form.render();
+                    if (canUpdate) {
+                        // 所属目录下拉：选择即移动到目标虚拟目录。
+                        initDeptDropdownSelect({
+                            container: '#file-detail-form',
+                            list: toDeptShape(folderFlat),
+                            hiddenName: 'folderId',
+                            inputSelector: '.layui-file-folder-input',
+                            value: row.folderId,
+                            rootParentId: '0'
+                        });
+                    }
+                }
+            });
+        }
+
+        form.on('submit(file-detail-save)', function (data) {
+            // 提交可改字段：文件名、需登录、所属目录（真移动）。
+            let payload = {
+                fileId: data.field.fileId,
+                folderId: data.field.folderId,
+                originalName: (data.field.originalName || '').trim(),
+                needLogin: parseInt(data.field.needLogin, 10)
+            };
+            putJson(FILE_PATH + '/update', payload, {
+                defaultMsg: '保存失败',
+                success: function (result) {
+                    if (isAjaxSuccess(result)) {
+                        layer.closeAll();
+                        layer.msg(result.msg, {icon: 1, time: 1000});
+                        reloadFileList(false);
+                    } else {
+                        layer.msg(result.msg || '保存失败', {icon: 2, time: 1000});
+                    }
+                }
+            });
+            return false;
+        });
+
+        function currentFolderName() {
+            return getFolderName(currentFolderId);
+        }
+
+        function buildUploadConfigField(item) {
+            let value = escapeHtml(item.configValue || '');
+            let code = escapeHtml(item.configCode);
+            let id = escapeHtml(item.configId);
+            let name = escapeHtml(item.configName);
+            if (item.valueType === 'boolean') {
+                let checked = item.configValue === 'true' ? ' checked' : '';
+                return '<div class="layui-form-item" data-config-id="' + id + '" data-config-code="' + code + '" data-value-type="boolean"><label class="layui-form-label">' + name + '</label><div class="layui-input-block"><input type="checkbox" lay-skin="switch" lay-text="开启|关闭"' + checked + '></div></div>';
+            }
+            if (item.valueType === 'json') {
+                return '<div class="layui-form-item" data-config-id="' + id + '" data-config-code="' + code + '" data-value-type="json"><label class="layui-form-label">' + name + '</label><div class="layui-input-block"><textarea maxlength="1000" class="layui-textarea">' + value + '</textarea></div></div>';
+            }
+            // 存储方式仅开放 local 下拉，其它类型后续扩展。
+            if (item.configCode === 'upload.storType') {
+                return '<div class="layui-form-item" data-config-id="' + id + '" data-config-code="' + code + '" data-value-type="string"><label class="layui-form-label">' + name + '</label><div class="layui-input-block"><select><option value="local"' + (item.configValue === 'local' ? ' selected' : '') + '>本地 local</option></select></div></div>';
+            }
+            let inputType = item.valueType === 'number' ? 'number' : 'text';
+            return '<div class="layui-form-item" data-config-id="' + id + '" data-config-code="' + code + '" data-value-type="' + escapeHtml(item.valueType) + '"><label class="layui-form-label">' + name + '</label><div class="layui-input-block"><input type="' + inputType + '" maxlength="1000" value="' + value + '" class="layui-input"></div></div>';
+        }
+
+        function saveUploadConfig() {
+            let configs = [];
+            $('[lay-filter="file-upload-config-form"] .layui-form-item[data-config-id]').each(function () {
+                let $item = $(this);
+                let valueType = $item.data('value-type');
+                let configValue = valueType === 'boolean'
+                    ? String($item.find('input[type="checkbox"]').prop('checked'))
+                    : $item.find('input,textarea,select').val();
+                configs.push({
+                    configId: $item.attr('data-config-id'),
+                    configCode: $item.attr('data-config-code'),
+                    configValue: configValue
+                });
+            });
+            let loading = layer.load();
+            // 复用系统配置分组保存接口。
+            putJson(CONFIG_PATH + '/updateGroup', {configGroup: 'upload', configs: configs}, {
+                defaultMsg: '保存上传配置失败',
+                success: function (result) {
+                    layer.close(loading);
+                    if (isAjaxSuccess(result)) {
+                        layer.closeAll();
+                        layer.msg(result.msg, {icon: 1, time: 1000});
+                        uploadRules = null;
+                        loadUploadRules();
+                    } else {
+                        layer.msg(result.msg || '保存上传配置失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    layer.close(loading);
+                }
+            });
+        }
+
+        function openUploadConfig() {
+            // 加载 upload 分组配置，按常规通高抽屉编辑。
+            getJson(CONFIG_PATH + '/group', {configGroup: 'upload'}, {
+                defaultMsg: '加载上传配置失败',
+                success: function (result) {
+                    if (!isAjaxSuccess(result)) {
+                        layer.msg(result.msg || '加载上传配置失败', {icon: 2, time: 1000});
+                        return;
+                    }
+                    let configs = result.data || [];
+                    let html = [];
+                    if (!configs.length) {
+                        html.push('<div class="layui-form-item"><div class="layui-input-block">暂无可维护配置</div></div>');
+                    }
+                    configs.forEach(function (item) {
+                        html.push(buildUploadConfigField(item));
+                    });
+                    $('#file-upload-config-fields').html(html.join(''));
+                    layer.open({
+                        type: 1,
+                        title: '上传配置',
+                        offset: 'l',
+                        anim: 'slideRight',
+                        // 上传项含多项与 JSON 文本域，字段多，用通高抽屉。
+                        area: ['560px', '100%'],
+                        shade: 0.1,
+                        shadeClose: true,
+                        id: 'file-upload-config-layer',
+                        content: $('#file-upload-config-modal'),
+                        success: function () {
+                            form.render(null, 'file-upload-config-form');
+                        }
+                    });
+                }
+            });
+        }
+
+        form.on('submit(file-upload-config-save)', function () {
+            saveUploadConfig();
+            return false;
+        });
+
+        window.closeCurrentLayer = function () {
+            layer.close(layer.index);
+        };
+
+        function openUpload() {
+            // 先确认上传开关与规则可用，再打开抽屉，避免关开关后仍能选文件打接口。
+            loadUploadRules(function (ok) {
+                if (!ok) {
+                    return;
+                }
+                let folderTip = currentFolderName();
+                if (!currentFolderId || currentFolderId === '0') {
+                    folderTip += '（上传将放入未分类）';
+                }
+                form.val('file-upload-form', {needLogin: '1', fileScene: 'image'});
+                $('#file-upload-folder-name').val(folderTip);
+                let uploadIndex = layer.open({
+                    type: 1,
+                    title: '上传文件',
+                    offset: 'r',
+                    anim: 'slideLeft',
+                    // 字段少，用短抽屉；字段多时才通高。
+                    area: ['420px', '48%'],
+                    shade: 0.1,
+                    shadeClose: true,
+                    content: $('#file-upload-form'),
+                    success: function (layero) {
+                        form.render();
+                        // 抽屉内提示需抬高 zIndex，否则 layer.msg 会被右侧抽屉挡住。
+                        let tipZIndex = (layero && layero.css('z-index'))
+                            ? (parseInt(layero.css('z-index'), 10) + 10)
+                            : undefined;
+                        function tipMsg(msg, icon, time) {
+                            let opts = {icon: icon || 2, time: time || 2000};
+                            if (tipZIndex) {
+                                opts.zIndex = tipZIndex;
+                            }
+                            layer.msg(msg, opts);
+                        }
+                        function bindUploader() {
+                            let scene = $('#file-upload-form select[name="fileScene"]').val() || 'image';
+                            updateUploadExtTip(scene);
+                            let exts = buildExts(scene);
+                            let acceptMime = buildAcceptMime(scene);
+                            let forceOverwrite = false;
+                            let $btn = $('#file-upload-btn');
+                            // 清掉旧隐藏 file 与实例标记，否则再次 render 会得到未初始化空壳（elemFile 为空）。
+                            $btn.siblings('input.layui-upload-file').remove();
+                            $btn.removeData('layui_upload_index');
+                            // 调用公共上传接口；先做同目录同名校验，确认后才允许覆盖。
+                            let uploadInst = upload.render({
+                                elem: '#file-upload-btn',
+                                url: FILE_PATH + '/upload',
+                                data: {folderId: currentFolderId || '0'},
+                                accept: 'file',
+                                auto: false,
+                                exts: exts || undefined,
+                                acceptMime: acceptMime || undefined,
+                                size: uploadRules && uploadRules.maxFileSizeMb ? uploadRules.maxFileSizeMb * 1024 : 0,
+                                headers: {'X-Requested-With': 'XMLHttpRequest'},
+                                text: {
+                                    'check-error': '所选文件类型不被允许'
+                                },
+                                choose: function (obj) {
+                                    let files = obj.pushFile();
+                                    let keys = Object.keys(files);
+                                    if (!keys.length) {
+                                        tipMsg('未选择到文件', 2);
+                                        return;
+                                    }
+                                    let fileKey = keys[keys.length - 1];
+                                    let file = files[fileKey];
+                                    let loading = layer.load(1, tipZIndex ? {shade: 0.1, zIndex: tipZIndex} : {shade: 0.1});
+                                    // 同目录同名校验。
+                                    getJson(FILE_PATH + '/checkName', {
+                                        folderId: currentFolderId || '0',
+                                        originalName: file.name
+                                    }, {
+                                        showMsg: false,
+                                        defaultMsg: '同名校验失败',
+                                        success: function (result) {
+                                            layer.close(loading);
+                                            if (!isAjaxSuccess(result)) {
+                                                delete files[fileKey];
+                                                tipMsg((result && result.msg) || '同名校验失败', 2);
+                                                return;
+                                            }
+                                            let startUpload = function (overwrite) {
+                                                forceOverwrite = !!overwrite;
+                                                // 把 choose 入队的 files 显式传给 upload，避免异步后队列对不上。
+                                                uploadInst.upload(files);
+                                            };
+                                            if (result.data === true) {
+                                                startUpload(false);
+                                                return;
+                                            }
+                                            layer.confirm('同目录下已存在同名文件，是否覆盖？', {
+                                                icon: 3,
+                                                title: '提示',
+                                                zIndex: tipZIndex
+                                            }, function (index) {
+                                                layer.close(index);
+                                                startUpload(true);
+                                            }, function () {
+                                                delete files[fileKey];
+                                            });
+                                        },
+                                        error: function (xhr) {
+                                            layer.close(loading);
+                                            delete files[fileKey];
+                                            tipMsg(getAjaxErrorMsg(xhr, '同名校验失败'), 2);
+                                        }
+                                    });
+                                },
+                                before: function () {
+                                    let needLogin = $('#file-upload-form input[name="needLogin"]:checked').val();
+                                    let currentScene = $('#file-upload-form select[name="fileScene"]').val() || 'image';
+                                    this.data.folderId = currentFolderId || '0';
+                                    this.data.needLogin = needLogin == null ? 1 : needLogin;
+                                    this.data.fileScene = currentScene;
+                                    this.data.forceOverwrite = forceOverwrite ? 1 : 0;
+                                },
+                                done: function (res) {
+                                    if (isAjaxSuccess(res)) {
+                                        layer.close(uploadIndex);
+                                        tipMsg(res.msg || '上传成功', 1, 1000);
+                                        reloadFileList(true);
+                                    } else {
+                                        tipMsg(res.msg || '上传失败', 2);
+                                    }
+                                },
+                                error: function (index, uploadRetry, res, xhr) {
+                                    tipMsg(resolveUploadErrorMsg(res, xhr, '上传失败'), 2);
+                                }
+                            });
+                        }
+                        window.__rebindFileUploader = bindUploader;
+                        bindUploader();
+                    },
+                    end: function () {
+                        window.__rebindFileUploader = null;
+                    }
+                });
+            });
+        }
+
+        function openOverwrite(fileId) {
+            // 覆盖上传同样依赖上传开关；关闭时直接提示，不打开抽屉。
+            loadUploadRules(function (ok) {
+                if (!ok) {
+                    return;
+                }
+                let row = findFileRow(fileId);
+                let scene = row && row.fileScene ? row.fileScene : 'image';
+                let idx = layer.open({
+                    type: 1,
+                    title: '覆盖上传',
+                    offset: 'r',
+                    anim: 'slideLeft',
+                    // 仅选择文件一项，用短抽屉；字段多时才通高。
+                    area: ['360px', '30%'],
+                    shade: 0.1,
+                    shadeClose: true,
+                    content: $('#file-overwrite-form'),
+                    success: function () {
+                        let exts = buildExts(scene);
+                        let acceptMime = buildAcceptMime(scene);
+                        let tipExts = extensionsForScene(scene);
+                        $('#file-overwrite-ext-tip').text(tipExts.length ? ('允许：' + tipExts.join('、')) : '');
+                        upload.render({
+                            elem: '#file-overwrite-btn',
+                            url: FILE_PATH + '/overwrite',
+                            data: {fileId: fileId},
+                            accept: 'file',
+                            exts: exts || undefined,
+                            acceptMime: acceptMime || undefined,
+                            size: uploadRules && uploadRules.maxFileSizeMb ? uploadRules.maxFileSizeMb * 1024 : 0,
+                            text: {
+                                'check-error': '所选文件类型不被允许'
+                            },
+                            done: function (res) {
+                                if (isAjaxSuccess(res)) {
+                                    layer.close(idx);
+                                    layer.msg(res.msg || '覆盖成功', {icon: 1, time: 1000});
+                                    reloadFileList(false);
+                                } else {
+                                    layer.msg(res.msg || '覆盖失败', {icon: 2, time: 2000});
+                                }
+                            },
+                            error: function (index, uploadRetry, res, xhr) {
+                                layer.msg(resolveUploadErrorMsg(res, xhr, '覆盖失败'), {icon: 2, time: 2000});
+                            }
+                        });
+                    }
+                });
+            });
+        }
+
+        function removeFiles(ids) {
+            // 删除前检查头像引用；确认后逻辑删库表并物理删磁盘文件。
+            getJson(FILE_PATH + '/checkRef', {ids: ids}, {
+                defaultMsg: '检查引用失败',
+                success: function (result) {
+                    let tip = '确定删除吗？磁盘文件将立即删除且不可恢复';
+                    if (isAjaxSuccess(result) && result.data && result.data.referenced) {
+                        tip = result.data.message || tip;
+                    }
+                    layer.confirm(tip, {icon: 3, title: '提示'}, function (index) {
+                        layer.close(index);
+                        deleteJson(FILE_PATH + '/delete', {ids: ids}, {
+                            defaultMsg: '删除失败',
+                            success: function (res) {
+                                if (isAjaxSuccess(res)) {
+                                    layer.msg(res.msg, {icon: 1, time: 1000});
+                                    reloadFileList(true);
+                                } else {
+                                    layer.msg(res.msg || '删除失败', {icon: 2, time: 1000});
+                                }
+                            }
+                        });
+                    });
+                }
+            });
+        }
+
+        reloadTree();
+        loadFileCards(true);
+    });
+</script>
+</body>
+</html>

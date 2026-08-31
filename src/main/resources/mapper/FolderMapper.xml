@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ylmao.admin.mapper.FolderMapper">
+
+    <select id="selectDescendantFoldersByPath" resultType="com.ylmao.admin.entity.Folder">
+        SELECT * FROM sys_folder
+        WHERE is_del = 0
+          AND (folder_path = #{pathPrefix} OR folder_path LIKE CONCAT(#{pathPrefix}, ',%'))
+    </select>
+
+    <update id="softDeleteByIds">
+        UPDATE sys_folder
+        SET is_del = 1, delete_time = #{deleteTime}
+        WHERE is_del = 0 AND folder_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+</mapper>

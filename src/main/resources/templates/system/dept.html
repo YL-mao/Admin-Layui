@@ -1,0 +1,535 @@
+﻿<!DOCTYPE html>
+<html xmlns:sa="https://www.thymeleaf.org/extras/sa-token" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{include :: header('部门管理')}"></head>
+<link rel="stylesheet" th:href="@{/static/admin/css/other/department.css}"/>
+<body class="pear-container">
+<div class="layui-card">
+    <div class="layui-card-body">
+        <form action="" class="layui-form">
+            <div class="layui-form-item">
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">部门名称</label>
+                    <div class="layui-input-inline">
+                        <input class="layui-input" maxlength="30" name="deptName" placeholder="请输入部门名称"
+                               type="text">
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <button class="pear-btn pear-btn-md pear-btn-primary" lay-filter="dept-query" lay-submit>
+                        <i class="layui-icon layui-icon-search"></i>
+                        查询
+                    </button>
+                    <button class="pear-btn pear-btn-md" id="dept-reset" type="reset">
+                        <i class="layui-icon layui-icon-refresh"></i>
+                        重置
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="layui-row layui-col-space15">
+    <div class="layui-col-md3">
+        <div class="layui-card">
+            <div class="layui-card-body">
+                <div id="organizationTreeContent" style="overflow: auto">
+                    <div class="organizationTree" id="organizationTree"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="layui-col-md9">
+        <div class="layui-card">
+            <div class="layui-card-body">
+                <table id="dept-table" lay-filter="dept-table"></table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script id="dept-toolbar" type="text/html">
+    <button sa:hasPermission="system:dept:insert" class="pear-btn pear-btn-primary pear-btn-md" lay-event="add">
+        <i class="layui-icon layui-icon-add-1"></i>
+        新增
+    </button>
+    <button sa:hasPermission="system:dept:delete" class="pear-btn pear-btn-danger pear-btn-md" lay-event="batchRemove">
+        <i class="layui-icon layui-icon-delete"></i>
+        删除
+    </button>
+    <button class="pear-btn pear-btn-success pear-btn-md" lay-event="clearFilter">
+        <i class="layui-icon layui-icon-clear"></i>
+        全部
+    </button>
+</script>
+
+<script id="dept-bar" type="text/html">
+    <button sa:hasPermission="system:dept:update" class="pear-btn pear-btn-primary pear-btn-sm" lay-event="edit"><i
+            class="layui-icon layui-icon-edit"></i></button>
+    <button sa:hasPermission="system:dept:delete" class="pear-btn pear-btn-danger pear-btn-sm" lay-event="remove"><i
+            class="layui-icon layui-icon-delete"></i></button>
+</script>
+
+<script id="dept-status" th:inline="none" type="text/html">
+    {{# if(d.isEnabled == 1){ }}
+    <input sa:hasPermission="system:dept:updateEnabled" type="checkbox" name="isEnabled" value="{{d.deptId}}"
+           lay-skin="switch" lay-text="启用|停用" lay-filter="dept-status" checked/>
+    {{# } else { }}
+    <input sa:hasPermission="system:dept:updateEnabled" type="checkbox" name="isEnabled" value="{{d.deptId}}"
+           lay-skin="switch" lay-text="启用|停用" lay-filter="dept-status"/>
+    {{# } }}
+</script>
+
+<script id="dept-form" type="text/html">
+    <form class="layui-form" lay-filter="dept-form" action="">
+        <div class="mainBox">
+            <div class="main-container">
+                <input type="hidden" name="deptId">
+                <input type="hidden" name="parentId">
+                <div class="layui-form-item">
+                    <label class="layui-form-label">上级部门</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="parentName" readonly class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">部门名称</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="deptName" lay-verify="required" maxlength="30"
+                               placeholder="请输入部门名称" autocomplete="off" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">排序</label>
+                    <div class="layui-input-block">
+                        <input type="number" name="orderNum" lay-verify="required|number" placeholder="请输入排序号"
+                               autocomplete="off" class="layui-input" value="1">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">负责人</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="deptLeader" maxlength="20" placeholder="请输入负责人"
+                               autocomplete="off" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">联系电话</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="leaderPhone" maxlength="11" placeholder="请输入联系电话"
+                               autocomplete="off" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">邮箱</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="leaderEmail" maxlength="50" placeholder="请输入邮箱" autocomplete="off"
+                               class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">状态</label>
+                    <div class="layui-input-block">
+                        <input type="radio" name="isEnabled" value="1" title="启用">
+                        <input type="radio" name="isEnabled" value="0" title="停用" checked>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="bottom">
+            <div class="button-container">
+                <button sa:hasPermissionOr="system:dept:insert,system:dept:update" type="submit"
+                        class="pear-btn pear-btn-primary pear-btn-sm" lay-submit lay-filter="dept-save">
+                    <i class="layui-icon layui-icon-ok"></i>
+                    提交
+                </button>
+                <button type="reset" class="pear-btn pear-btn-sm">
+                    <i class="layui-icon layui-icon-refresh"></i>
+                    重置
+                </button>
+            </div>
+        </div>
+    </form>
+</script>
+
+<th:block th:insert="~{include :: footer}"/>
+<script>
+    /* global layui, apiPath, buildDeptTree */
+    layui.use(['common', 'table', 'form', 'jquery', 'tree'], function () {
+        let table = layui.table;
+        let form = layui.form;
+        let $ = layui.jquery;
+        let tree = layui.tree;
+
+        let MODULE_PATH = apiPath + "/dept";
+        let queryWhere = {};
+        let selectedParentId = '';
+        let tableRendered = false;
+        let deptTreeRendered = false;
+        let formMode = 'add';
+        let deptNameMap = {};
+
+        function loadDeptTreeData(callback) {
+            // 调用后台加载左侧部门树。
+            getJson(MODULE_PATH + '/tree', null, {
+                defaultMsg: '部门树加载失败',
+                showMsg: false,
+                success: function (result) {
+                    let list = isAjaxSuccess(result) ? (result.data || []) : [];
+                    deptNameMap = {};
+                    list.forEach(function (item) {
+                        deptNameMap[item.deptId] = item.deptName;
+                    });
+                    callback(list);
+                },
+                error: function () {
+                    callback([]);
+                }
+            });
+        }
+
+        function renderDeptTree() {
+            loadDeptTreeData(function (list) {
+                let treeData = buildDeptTree(list, '0', 0);
+                if (deptTreeRendered) {
+                    tree.reload('organizationTree', {data: treeData});
+                    return;
+                }
+                tree.render({
+                    elem: '#organizationTree',
+                    id: 'organizationTree',
+                    data: treeData,
+                    showLine: true,
+                    click: function (obj) {
+                        selectedParentId = obj.data.id;
+                        renderTable($.extend({}, queryWhere, {parentId: selectedParentId}));
+                    }
+                });
+                deptTreeRendered = true;
+            });
+        }
+
+        function reloadDeptTree() {
+            renderDeptTree();
+        }
+
+        function getDeptName(deptId) {
+            return !deptId || deptId === '0' ? '顶级部门' : (deptNameMap[deptId] || '顶级部门');
+        }
+
+        let cols = [
+            [{
+                type: 'checkbox'
+            },
+                {
+                    title: '部门名称',
+                    field: 'deptName',
+                    align: 'left'
+                },
+                {
+                    title: '排序',
+                    field: 'orderNum',
+                    align: 'center',
+                    width: 80
+                },
+                {
+                    title: '负责人',
+                    field: 'deptLeader',
+                    align: 'center'
+                },
+                {
+                    title: '联系电话',
+                    field: 'leaderPhone',
+                    align: 'center'
+                },
+                {
+                    title: '邮箱',
+                    field: 'leaderEmail',
+                    align: 'center'
+                },
+                {
+                    title: '状态',
+                    field: 'isEnabled',
+                    templet: '#dept-status',
+                    align: 'center',
+                    width: 100
+                },
+                {
+                    title: '操作',
+                    toolbar: '#dept-bar',
+                    align: 'center',
+                    width: 130
+                }
+            ]
+        ];
+
+        window.queryWhere = queryWhere;
+
+        window.renderTable = function (where) {
+            queryWhere = where || {};
+            window.queryWhere = queryWhere;
+            if (tableRendered) {
+                table.reload('dept-table', {
+                    where: queryWhere,
+                    done: function () {
+                        form.render('checkbox');
+                    }
+                });
+                return;
+            }
+            // 从后台加载部门列表。
+            table.render({
+                response: TABLE_RESPONSE,
+                id: 'dept-table',
+                elem: '#dept-table',
+                url: MODULE_PATH + '/list',
+                where: queryWhere,
+                height: 'full-200',
+                page: false,
+                cols: cols,
+                skin: 'line',
+                toolbar: '#dept-toolbar',
+                defaultToolbar: [{
+                    title: '刷新',
+                    layEvent: 'refresh',
+                    icon: 'layui-icon-refresh',
+                }, 'filter', 'print', 'exports'],
+                done: function () {
+                    form.render('checkbox');
+                }
+            });
+            tableRendered = true;
+        };
+
+        renderDeptTree();
+        renderTable();
+
+        form.on('submit(dept-query)', function (data) {
+            let where = data.field;
+            if (selectedParentId) {
+                where.parentId = selectedParentId;
+            }
+            renderTable(where);
+            return false;
+        });
+
+        $('#dept-reset').on('click', function () {
+            selectedParentId = '';
+            queryWhere = {};
+            setTimeout(function () {
+                renderTable();
+            }, 0);
+        });
+
+        form.on('switch(dept-status)', function (obj) {
+            // isEnabled 使用布尔语义，1 表示启用，0 表示停用。
+            let isEnabled = obj.elem.checked ? 1 : 0;
+            // 调用后台切换部门启停状态。
+            patchJson(MODULE_PATH + '/updateEnabled', {
+                deptId: this.value,
+                isEnabled: isEnabled
+            }, {
+                defaultMsg: '状态更新失败',
+                success: function (result) {
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg, {icon: 1, time: 1000});
+                    } else {
+                        obj.elem.checked = !obj.elem.checked;
+                        form.render('checkbox');
+                        layer.msg(result.msg || '状态更新失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    obj.elem.checked = !obj.elem.checked;
+                    form.render('checkbox');
+                }
+            });
+        });
+
+        function checkDeptNameUnique(parentId, deptName, callback) {
+            // 调用后台校验同级部门名称是否已存在。
+            checkUnique(MODULE_PATH + '/checkName', {parentId: parentId, deptName: deptName}, callback);
+        }
+
+        function saveDept(data) {
+            let loading = layer.load();
+            delete data.field.parentName;
+            // 按表单模式调用后台新增或修改部门。
+            (formMode === 'add' ? postJson : putJson)(MODULE_PATH + (formMode === 'add' ? '/add' : '/update'), data.field, {
+                defaultMsg: '操作失败',
+                success: function (result) {
+                    layer.close(loading);
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                            layer.closeAll('page');
+                            renderTable(queryWhere);
+                            reloadDeptTree();
+                        });
+                    } else {
+                        layer.msg(result.msg || '操作失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    layer.close(loading);
+                }
+            });
+        }
+
+        form.on('submit(dept-save)', function (data) {
+            let originalDeptName = $(data.form).find('[name="deptName"]').attr('data-original-dept-name');
+            let originalParentId = $(data.form).find('[name="parentId"]').attr('data-original-parent-id');
+            let unchanged = data.field.deptId
+                && originalDeptName === data.field.deptName
+                && originalParentId === data.field.parentId;
+            if (unchanged) {
+                saveDept(data);
+                return false;
+            }
+            checkDeptNameUnique(data.field.parentId, data.field.deptName, function (unique) {
+                if (unique) {
+                    saveDept(data);
+                } else {
+                    layer.msg('同级部门名称已存在', {icon: 2, time: 1000});
+                }
+            });
+            return false;
+        });
+
+        table.on('tool(dept-table)', function (obj) {
+            if (obj.event === 'remove') {
+                window.remove(obj);
+            } else if (obj.event === 'edit') {
+                window.edit(obj);
+            }
+        });
+
+        table.on('toolbar(dept-table)', function (obj) {
+            if (obj.event === 'add') {
+                window.add();
+            } else if (obj.event === 'refresh') {
+                window.refresh();
+            } else if (obj.event === 'batchRemove') {
+                window.batchRemove(obj);
+            } else if (obj.event === 'clearFilter') {
+                selectedParentId = '';
+                renderTable(queryWhere.deptName ? {deptName: queryWhere.deptName} : {});
+            }
+        });
+
+        function openDeptForm(mode, obj) {
+            formMode = mode;
+            let row = obj ? obj.data : null;
+            let parentId = mode === 'add' ? (selectedParentId || '0') : (row.parentId || '0');
+            layer.open({
+                type: 1,
+                title: mode === 'add' ? '新增部门' : '修改部门',
+                offset: mode === 'add' ? 'b' : 'r',
+                anim: mode === 'add' ? 'slideUp' : 'slideLeft',
+                shade: 0.1,
+                shadeClose: true,
+                id: mode === 'add' ? 'dept-add-layer' : 'dept-edit-layer',
+                area: mode === 'add' ? ['800px', '70%'] : ['500px', '60%'],
+                content: $('#dept-form').html(),
+                success: function (layero) {
+                    form.render();
+                    if (mode === 'edit' && row) {
+                        layero.find('[name="deptName"]').attr('data-original-dept-name', row.deptName);
+                        layero.find('[name="parentId"]').attr('data-original-parent-id', parentId);
+                        form.val('dept-form', {
+                            deptId: row.deptId,
+                            parentId: parentId,
+                            parentName: getDeptName(parentId),
+                            deptName: row.deptName,
+                            orderNum: row.orderNum,
+                            deptLeader: row.deptLeader,
+                            leaderPhone: row.leaderPhone,
+                            leaderEmail: row.leaderEmail,
+                            isEnabled: String(row.isEnabled)
+                        });
+                    } else {
+                        form.val('dept-form', {
+                            deptId: '',
+                            parentId: parentId,
+                            parentName: getDeptName(parentId),
+                            deptName: '',
+                            orderNum: 1,
+                            deptLeader: '',
+                            leaderPhone: '',
+                            leaderEmail: '',
+                            isEnabled: '0'
+                        });
+                    }
+                }
+            });
+        }
+
+        window.add = function () {
+            openDeptForm('add', null);
+        };
+
+        window.edit = function (obj) {
+            openDeptForm('edit', obj);
+        };
+
+        window.remove = function (obj) {
+            layer.confirm('确定要删除该部门吗？', {icon: 3, title: '提示'}, function (index) {
+                layer.close(index);
+                let loading = layer.load();
+                // 调用后台删除当前部门。
+                deleteJson(MODULE_PATH + '/delete', {ids: obj.data.deptId}, {
+                    defaultMsg: '删除失败',
+                    success: function (result) {
+                        layer.close(loading);
+                        if (isAjaxSuccess(result)) {
+                            layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                                renderTable(queryWhere);
+                                reloadDeptTree();
+                            });
+                        } else {
+                            layer.msg(result.msg || '删除失败', {icon: 2, time: 1000});
+                        }
+                    },
+                    error: function () {
+                        layer.close(loading);
+                    }
+                });
+            });
+        };
+
+        window.batchRemove = function (obj) {
+            let ids = getCheckedFieldIds(obj, 'deptId');
+            if (ids === '') {
+                layer.msg('未选中数据', {icon: 3, time: 1000});
+                return false;
+            }
+            layer.confirm('确定要删除这些部门吗？', {icon: 3, title: '提示'}, function (index) {
+                layer.close(index);
+                let loading = layer.load();
+                // 调用后台批量删除选中的部门。
+                deleteJson(MODULE_PATH + '/delete', {ids: ids}, {
+                    defaultMsg: '删除失败',
+                    success: function (result) {
+                        layer.close(loading);
+                        if (isAjaxSuccess(result)) {
+                            layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                                renderTable(queryWhere);
+                                reloadDeptTree();
+                            });
+                        } else {
+                            layer.msg(result.msg || '删除失败', {icon: 2, time: 1000});
+                        }
+                    },
+                    error: function () {
+                        layer.close(loading);
+                    }
+                });
+            });
+        };
+
+        window.refresh = function () {
+            renderTable(queryWhere);
+            reloadDeptTree();
+        };
+    });
+</script>
+</body>
+</html>

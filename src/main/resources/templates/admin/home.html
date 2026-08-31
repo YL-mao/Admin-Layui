@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{include :: header('后台首页')}"></head>
+<link rel="stylesheet" th:href="@{/static/admin/css/home-console.css}"/>
+<style>
+    .home-metric .layui-card-body {
+        height: auto;
+        min-height: 72px;
+        padding: 12px 15px;
+    }
+    .home-metric-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+    }
+    .home-metric-main { min-width: 0; flex: 1; }
+    .home-metric-value {
+        font-size: 24px;
+        line-height: 1.3;
+        font-weight: 600;
+        color: #28333E;
+        word-break: break-all;
+    }
+    .home-metric-sub { color: #999; font-size: 12px; margin-top: 4px; }
+    .home-metric-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .home-metric-icon .layui-icon { font-size: 26px; color: #fff; }
+    .home-metric-icon.runtime { background: #36b368; }
+    .home-metric-icon.cpu { background: #2d8cf0; }
+    .home-metric-icon.jvm { background: #f6ad55; }
+    .home-metric-icon.mem { background: #ed4014; }
+
+    .home-card-title .layui-icon {
+        margin-right: 6px;
+        color: #36b368;
+        font-size: 16px;
+    }
+    .home-list { margin: 0; padding: 0; list-style: none; }
+    .home-list li {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    .home-list li:last-child { border-bottom: none; }
+    .home-list .item-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+        flex: 1;
+    }
+    .home-list .item-icon {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #f0f9eb;
+        color: #36b368;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .home-list .item-icon.log { background: #ecf5ff; color: #2d8cf0; }
+    .home-list .item-icon.disk { background: #fdf6ec; color: #e6a23c; }
+    .home-list .title {
+        color: #333;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .home-list .meta { color: #999; white-space: nowrap; font-size: 12px; }
+    .home-empty {
+        color: #999;
+        padding: 24px 0;
+        text-align: center;
+    }
+    .home-empty .layui-icon {
+        display: block;
+        font-size: 36px;
+        margin-bottom: 8px;
+        color: #dcdfe6;
+    }
+    .home-kv {
+        display: flex;
+        align-items: center;
+        line-height: 34px;
+        gap: 8px;
+    }
+    .home-kv .kv-icon {
+        width: 22px;
+        color: #36b368;
+        text-align: center;
+    }
+    .home-kv .label { width: 72px; color: #999; flex-shrink: 0; }
+    .home-kv .value { color: #333; word-break: break-all; }
+    .home-warn {
+        color: #e6a23c;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+</style>
+<body class="pear-container">
+<div class="layui-row layui-col-space10">
+    <div class="layui-col-xs12" th:if="${!monitorOk}">
+        <div class="layui-card">
+            <div class="layui-card-body home-warn">
+                <i class="layui-icon layui-icon-about"></i>
+                <span>系统监控读取失败，已降级展示业务数据。</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="layui-col-xs6 layui-col-md3">
+        <div class="layui-card top-panel home-metric">
+            <div class="layui-card-header">JVM 运行时长</div>
+            <div class="layui-card-body">
+                <div class="home-metric-row">
+                    <div class="home-metric-main">
+                        <div class="home-metric-value" th:text="${runtime}">-</div>
+                        <div class="home-metric-sub">自进程启动累计</div>
+                    </div>
+                    <div class="home-metric-icon runtime">
+                        <i class="layui-icon layui-icon-time"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="layui-col-xs6 layui-col-md3">
+        <div class="layui-card top-panel home-metric">
+            <div class="layui-card-header">CPU 使用率</div>
+            <div class="layui-card-body">
+                <div class="home-metric-row">
+                    <div class="home-metric-main">
+                        <div class="home-metric-value"><span th:text="${cpuUsePercent}">-</span>%</div>
+                        <div class="home-metric-sub">当前系统 CPU</div>
+                    </div>
+                    <div class="home-metric-icon cpu">
+                        <i class="layui-icon layui-icon-engine"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="layui-col-xs6 layui-col-md3">
+        <div class="layui-card top-panel home-metric">
+            <div class="layui-card-header">JVM 内存</div>
+            <div class="layui-card-body">
+                <div class="home-metric-row">
+                    <div class="home-metric-main">
+                        <div class="home-metric-value"><span th:text="${jvmUsePercent}">-</span>%</div>
+                        <div class="home-metric-sub">
+                            <span th:text="${jvmUsedMemory}">-</span> / <span th:text="${jvmTotalMemory}">-</span>
+                        </div>
+                    </div>
+                    <div class="home-metric-icon jvm">
+                        <i class="layui-icon layui-icon-template-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="layui-col-xs6 layui-col-md3">
+        <div class="layui-card top-panel home-metric">
+            <div class="layui-card-header">系统内存</div>
+            <div class="layui-card-body">
+                <div class="home-metric-row">
+                    <div class="home-metric-main">
+                        <div class="home-metric-value"><span th:text="${memUsePercent}">-</span>%</div>
+                        <div class="home-metric-sub">
+                            <span th:text="${memUsed}">-</span> / <span th:text="${memTotal}">-</span>
+                        </div>
+                    </div>
+                    <div class="home-metric-icon mem">
+                        <i class="layui-icon layui-icon-chart"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="layui-row layui-col-space10">
+    <div class="layui-col-md8">
+        <div class="layui-card">
+            <div class="layui-card-header home-card-title">
+                <i class="layui-icon layui-icon-notice"></i>最新公告
+            </div>
+            <div class="layui-card-body">
+                <ul class="home-list" th:if="${!#lists.isEmpty(sysNotices)}">
+                    <li th:each="n : ${sysNotices}">
+                        <div class="item-left">
+                            <span class="item-icon"><i class="layui-icon layui-icon-speaker"></i></span>
+                            <span class="title" th:text="${n.noticeTitle}">公告标题</span>
+                        </div>
+                        <span class="meta"
+                              th:text="${n.sendTime != null ? #temporals.format(n.sendTime, 'yyyy-MM-dd HH:mm') : '-'}">-</span>
+                    </li>
+                </ul>
+                <div class="home-empty" th:if="${#lists.isEmpty(sysNotices)}">
+                    <i class="layui-icon layui-icon-notice"></i>
+                    暂无公告
+                </div>
+            </div>
+        </div>
+
+        <div class="layui-card" style="margin-top: 10px;">
+            <div class="layui-card-header home-card-title">
+                <i class="layui-icon layui-icon-log"></i>最近操作
+            </div>
+            <div class="layui-card-body">
+                <ul class="home-list" th:if="${!#lists.isEmpty(sysOperLog)}">
+                    <li th:each="log : ${sysOperLog}">
+                        <div class="item-left">
+                            <span class="item-icon log"><i class="layui-icon layui-icon-edit"></i></span>
+                            <span class="title">
+                                <span th:text="${log.operateName}">-</span>
+                                ·
+                                <span th:text="${log.operateTitle}">操作</span>
+                            </span>
+                        </div>
+                        <span class="meta"
+                              th:text="${log.operateTime != null ? #temporals.format(log.operateTime, 'yyyy-MM-dd HH:mm') : '-'}">-</span>
+                    </li>
+                </ul>
+                <div class="home-empty" th:if="${#lists.isEmpty(sysOperLog)}">
+                    <i class="layui-icon layui-icon-log"></i>
+                    暂无操作记录
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="layui-col-md4">
+        <div class="layui-card">
+            <div class="layui-card-header home-card-title">
+                <i class="layui-icon layui-icon-set"></i>运行环境
+            </div>
+            <div class="layui-card-body">
+                <div class="home-kv">
+                    <span class="kv-icon"><i class="layui-icon layui-icon-windows"></i></span>
+                    <span class="label">操作系统</span>
+                    <span class="value" th:text="${osName}">-</span>
+                </div>
+                <div class="home-kv">
+                    <span class="kv-icon"><i class="layui-icon layui-icon-website"></i></span>
+                    <span class="label">本机 IP</span>
+                    <span class="value" th:text="${osIp}">-</span>
+                </div>
+                <div class="home-kv">
+                    <span class="kv-icon"><i class="layui-icon layui-icon-component"></i></span>
+                    <span class="label">JDK</span>
+                    <span class="value" th:text="${jdkName}">-</span>
+                </div>
+                <div class="home-kv">
+                    <span class="kv-icon"><i class="layui-icon layui-icon-vercode"></i></span>
+                    <span class="label">JDK 版本</span>
+                    <span class="value" th:text="${jdkVersion}">-</span>
+                </div>
+                <div class="home-kv">
+                    <span class="kv-icon"><i class="layui-icon layui-icon-chart-screen"></i></span>
+                    <span class="label">磁盘占用</span>
+                    <span class="value"><span th:text="${diskUsePercent}">-</span>%</span>
+                </div>
+                <div class="home-kv">
+                    <span class="kv-icon"><i class="layui-icon layui-icon-date"></i></span>
+                    <span class="label">启动时间</span>
+                    <span class="value" th:text="${appStartTime}">-</span>
+                </div>
+                <div class="home-kv">
+                    <span class="kv-icon"><i class="layui-icon layui-icon-group"></i></span>
+                    <span class="label">线程</span>
+                    <span class="value">
+                        当前 <span th:text="${threadCount}">-</span>
+                        · 守护 <span th:text="${daemonThreadCount}">-</span>
+                        · 峰值 <span th:text="${peakThreadCount}">-</span>
+                    </span>
+                </div>
+                <div class="home-kv">
+                    <span class="kv-icon"><i class="layui-icon layui-icon-console"></i></span>
+                    <span class="label">数据源</span>
+                    <span class="value" th:if="${dsPoolOk}">
+                        活跃 <span th:text="${dsActive}">-</span>
+                        · 空闲 <span th:text="${dsIdle}">-</span>
+                        · 总计 <span th:text="${dsTotal}">-</span>
+                        / 最大 <span th:text="${dsMaxPoolSize}">-</span>
+                        · 等待 <span th:text="${dsWaiting}">-</span>
+                    </span>
+                    <span class="value" th:if="${!dsPoolOk}">不可用</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="layui-card" style="margin-top: 10px;">
+            <div class="layui-card-header home-card-title">
+                <i class="layui-icon layui-icon-file"></i>磁盘分区
+            </div>
+            <div class="layui-card-body">
+                <ul class="home-list" th:if="${!#lists.isEmpty(diskInfos)}">
+                    <li th:each="d : ${diskInfos}">
+                        <div class="item-left">
+                            <span class="item-icon disk"><i class="layui-icon layui-icon-slider"></i></span>
+                            <span class="title" th:text="${d.mount}">/</span>
+                        </div>
+                        <span class="meta">
+                            <span th:text="${d.usePercent}">0</span>%
+                            ·
+                            <span th:text="${d.used}">0</span>/<span th:text="${d.size}">0</span>
+                        </span>
+                    </li>
+                </ul>
+                <div class="home-empty" th:if="${#lists.isEmpty(diskInfos)}">
+                    <i class="layui-icon layui-icon-file"></i>
+                    暂无磁盘信息
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<th:block th:insert="~{include :: footer}"/>
+</body>
+</html>

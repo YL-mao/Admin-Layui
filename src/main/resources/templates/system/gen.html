@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sa="https://www.thymeleaf.org/extras/sa-token">
+<head th:replace="~{include :: header('代码生成')}"></head>
+<body class="pear-container">
+<blockquote class="layui-elem-quote" style="margin: 0 0 15px;">
+    仅下载 ZIP，不在服务端写盘；解压到项目根目录后自行合并与执行 SQL。
+</blockquote>
+<div class="layui-row layui-col-space15">
+    <div class="layui-col-md4">
+        <div class="layui-card">
+            <div class="layui-card-header">基本配置</div>
+            <div class="layui-card-body">
+                <form class="layui-form" lay-filter="gen-form" action="">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">数据表</label>
+                        <div class="layui-input-block">
+                            <select name="tableName" lay-verify="required" lay-filter="gen-table" lay-search="">
+                                <option value="">请选择数据表</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">模块名</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="moduleName" lay-verify="required" placeholder="URL 主体，如 demo" class="layui-input">
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">生成目录</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="packagePath" lay-verify="required" placeholder="如 demo 或 system" class="layui-input" title="对应 controller/{目录} 与 templates/{目录}">
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">类名</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="className" lay-verify="required" placeholder="PascalCase，如 Demo" class="layui-input">
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">业务名称</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="functionName" lay-verify="required" placeholder="中文，如 演示" class="layui-input">
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">权限前缀</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="permPrefix" lay-verify="required" placeholder="如 system:demo" class="layui-input">
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">上级菜单</label>
+                        <div class="layui-input-block">
+                            <input type="hidden" name="parentPermId" value="1220343202867975100">
+                            <div class="gen-parent-select" style="position: relative;">
+                                <input type="text" id="gen-parent-label" readonly class="layui-input" placeholder="请选择上级目录或菜单" style="cursor: pointer;">
+                                <div id="gen-parent-dropdown" class="layui-anim layui-anim-upbit"
+                                     style="display: none; position: absolute; left: 0; right: 0; top: 38px; z-index: 999; max-height: 280px; overflow: auto; padding: 8px 12px; background: #fff; border: 1px solid #eee; border-radius: 2px; box-shadow: 0 2px 8px rgba(0,0,0,.12);">
+                                    <div id="gen-parent-tree"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">作者</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="author" placeholder="可选，默认 codegen" class="layui-input">
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <div class="layui-input-block">
+                            <button sa:hasPermission="system:gen:download" type="button" class="pear-btn pear-btn-primary" id="gen-download-btn">
+                                <i class="layui-icon layui-icon-download-circle"></i>
+                                生成并下载 ZIP
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="layui-col-md8">
+        <div class="layui-card">
+            <div class="layui-card-header">字段配置</div>
+            <div class="layui-card-body">
+                <table id="gen-column-table" lay-filter="gen-column-table"></table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="text/html" id="gen-comment-tpl" th:inline="none">
+<input type="text" class="layui-input gen-column-comment" lay-ignore data-column="{{= d.columnName }}"
+       value="{{= d.columnComment || '' }}" maxlength="100" placeholder="页面展示名称">
+</script>
+
+<script type="text/html" id="gen-java-type-tpl" th:inline="none">
+<select class="layui-input gen-java-type" lay-ignore data-column="{{= d.columnName }}">
+    <option value="String" {{# if(d.javaType === 'String'){ }}selected{{# } }}>String</option>
+    <option value="Integer" {{# if(d.javaType === 'Integer'){ }}selected{{# } }}>Integer</option>
+    <option value="Long" {{# if(d.javaType === 'Long'){ }}selected{{# } }}>Long</option>
+    <option value="BigDecimal" {{# if(d.javaType === 'BigDecimal'){ }}selected{{# } }}>BigDecimal</option>
+    <option value="LocalDateTime" {{# if(d.javaType === 'LocalDateTime'){ }}selected{{# } }}>LocalDateTime</option>
+    <option value="Float" {{# if(d.javaType === 'Float'){ }}selected{{# } }}>Float</option>
+    <option value="Double" {{# if(d.javaType === 'Double'){ }}selected{{# } }}>Double</option>
+</select>
+</script>
+
+<script type="text/html" id="gen-form-field-tpl" th:inline="none">
+{{# if(d.optionLocked){ }}
+    <span class="layui-badge layui-bg-gray">否</span>
+{{# } else { }}
+    <input type="checkbox" lay-ignore class="gen-form-field" data-column="{{= d.columnName }}"
+           {{# if(d.formField){ }}checked{{# } }}>
+{{# } }}
+</script>
+
+<script type="text/html" id="gen-query-field-tpl" th:inline="none">
+{{# if(d.optionLocked){ }}
+    <span class="layui-badge layui-bg-gray">否</span>
+{{# } else { }}
+    <input type="checkbox" lay-ignore class="gen-query-field" data-column="{{= d.columnName }}"
+           {{# if(d.listQueryField){ }}checked{{# } }}>
+{{# } }}
+</script>
+
+<script type="text/html" id="gen-display-field-tpl" th:inline="none">
+{{# if(d.primaryKey){ }}
+    <span class="layui-badge layui-bg-gray">否</span>
+{{# } else { }}
+    <input type="checkbox" lay-ignore class="gen-display-field" data-column="{{= d.columnName }}"
+           {{# if(d.listDisplayField){ }}checked{{# } }}>
+{{# } }}
+</script>
+
+<th:block th:insert="~{include :: footer}"/>
+<script th:inline="none">
+    layui.use(['common', 'form', 'table', 'jquery', 'tree'], function () {
+        let form = layui.form;
+        let table = layui.table;
+        let tree = layui.tree;
+        let $ = layui.jquery;
+        let MODULE_PATH = apiPath + '/gen';
+        let DEFAULT_PARENT_ID = '1220343202867975100';
+        let PARENT_TREE_ID = 'gen-parent-tree';
+        let columnRows = [];
+        let parentMenuList = [];
+
+        function buildParentTreeData(list, parentId) {
+            return list.filter(function (item) {
+                return String(item.parentId || '0') === String(parentId);
+            }).map(function (item) {
+                let typeLabel = item.permType === 0 ? '目录' : '菜单';
+                let children = buildParentTreeData(list, item.permId);
+                return {
+                    title: item.permName + '（' + typeLabel + '）',
+                    id: item.permId,
+                    spread: item.permId === DEFAULT_PARENT_ID || children.some(function (child) {
+                        return child.spread || child.id === DEFAULT_PARENT_ID;
+                    }),
+                    children: children
+                };
+            });
+        }
+
+        function findParentMenu(permId) {
+            return parentMenuList.find(function (item) {
+                return item.permId === permId;
+            }) || null;
+        }
+
+        function setParentSelection(permId) {
+            let item = findParentMenu(permId);
+            $('input[name="parentPermId"]').val(permId || '');
+            if (item) {
+                let typeLabel = item.permType === 0 ? '目录' : '菜单';
+                $('#gen-parent-label').val(item.permName + '（' + typeLabel + '）');
+            } else {
+                $('#gen-parent-label').val('');
+            }
+        }
+
+        function closeParentDropdown() {
+            $('#gen-parent-dropdown').hide();
+        }
+
+        function toggleParentDropdown() {
+            let $dropdown = $('#gen-parent-dropdown');
+            if ($dropdown.is(':visible')) {
+                closeParentDropdown();
+            } else {
+                $dropdown.show();
+            }
+        }
+
+        // 从后台加载可选上级目录/菜单，渲染 Layui 无连接线树到下拉面板。
+        $.get(MODULE_PATH + '/parentMenus', function (res) {
+            if (!isAjaxSuccess(res)) {
+                layer.msg(res.msg || '加载上级菜单失败', {icon: 2});
+                return;
+            }
+            parentMenuList = res.data || [];
+            tree.render({
+                elem: '#gen-parent-tree',
+                id: PARENT_TREE_ID,
+                data: buildParentTreeData(parentMenuList, '0'),
+                showLine: false,
+                onlyIconControl: true,
+                click: function (obj) {
+                    setParentSelection(obj.data.id);
+                    closeParentDropdown();
+                }
+            });
+            setParentSelection(DEFAULT_PARENT_ID);
+        });
+
+        $('#gen-parent-label').on('click', function (e) {
+            e.stopPropagation();
+            toggleParentDropdown();
+        });
+
+        $('#gen-parent-dropdown').on('click', function (e) {
+            e.stopPropagation();
+        });
+
+        $(document).on('click.genParentDropdown', function () {
+            closeParentDropdown();
+        });
+
+        // 从后台加载可选数据表。
+        $.get(MODULE_PATH + '/tables', function (res) {
+            if (!isAjaxSuccess(res)) {
+                layer.msg(res.msg || '加载表清单失败', {icon: 2});
+                return;
+            }
+            let html = '<option value="">请选择数据表</option>';
+            (res.data || []).forEach(function (item) {
+                let label = item.tableComment ? item.tableName + '（' + item.tableComment + '）' : item.tableName;
+                html += '<option value="' + item.tableName + '">' + label + '</option>';
+            });
+            $('select[name="tableName"]').html(html);
+            form.render('select');
+        });
+
+        function tableToModule(tableName) {
+            let name = (tableName || '').toLowerCase();
+            if (name.indexOf('sys_') === 0) {
+                name = name.substring(4);
+            }
+            return name;
+        }
+
+        // 与后端 GenNaming.toPascalCase 一致：sys_user_role → UserRole。
+        function tableToClass(tableName) {
+            return tableToModule(tableName).split(/[_-]+/).filter(Boolean).map(function (part) {
+                return part.charAt(0).toUpperCase() + part.slice(1);
+            }).join('');
+        }
+
+        function findColumn(columnName) {
+            return columnRows.find(function (row) {
+                return row.columnName === columnName;
+            }) || null;
+        }
+
+        form.on('select(gen-table)', function (data) {
+            let tableName = data.value;
+            if (!tableName) {
+                return;
+            }
+            let moduleName = tableToModule(tableName);
+            form.val('gen-form', {
+                moduleName: moduleName,
+                packagePath: moduleName,
+                className: tableToClass(tableName),
+                functionName: moduleName,
+                permPrefix: 'system:' + moduleName
+            });
+            loadColumns(tableName);
+        });
+
+        function loadColumns(tableName) {
+            // 从后台加载表字段预览，支持页面勾选覆盖。
+            $.get(MODULE_PATH + '/columns', {tableName: tableName}, function (res) {
+                if (!isAjaxSuccess(res)) {
+                    layer.msg(res.msg || '加载字段失败', {icon: 2});
+                    return;
+                }
+                columnRows = res.data || [];
+                table.render({
+                    elem: '#gen-column-table',
+                    id: 'gen-column-table',
+                    data: columnRows,
+                    page: false,
+                    cols: [
+                        [
+                            {title: '列名', field: 'columnName', align: 'center'},
+                            {title: '注释', field: 'columnComment', align: 'center', templet: '#gen-comment-tpl'},
+                            {title: 'Java类型', field: 'javaType', align: 'center', templet: '#gen-java-type-tpl'},
+                            {title: '主键', field: 'primaryKey', align: 'center', templet: function (d) {
+                                    return d.primaryKey ? '是' : '否';
+                                }},
+                            {title: '表单', field: 'formField', align: 'center', templet: '#gen-form-field-tpl'},
+                            // 展示=列表表格列；查询=上方筛选条件；主键固定不可展示。
+                            {title: '展示', field: 'listDisplayField', align: 'center', templet: '#gen-display-field-tpl'},
+                            {title: '查询', field: 'listQueryField', align: 'center', templet: '#gen-query-field-tpl'}
+                        ]
+                    ],
+                    skin: 'line'
+                });
+            });
+        }
+
+        $(document).on('change input', '.gen-column-comment', function () {
+            let row = findColumn($(this).data('column'));
+            if (row) {
+                row.columnComment = $(this).val();
+            }
+        });
+
+        $(document).on('change', '.gen-java-type', function () {
+            let row = findColumn($(this).data('column'));
+            if (row) {
+                row.javaType = $(this).val();
+            }
+        });
+
+        $(document).on('change', '.gen-form-field', function () {
+            let row = findColumn($(this).data('column'));
+            if (row && !row.optionLocked) {
+                row.formField = this.checked;
+            }
+        });
+
+        $(document).on('change', '.gen-query-field', function () {
+            let row = findColumn($(this).data('column'));
+            if (row && !row.optionLocked) {
+                row.listQueryField = this.checked;
+            }
+        });
+
+        $(document).on('change', '.gen-display-field', function () {
+            let row = findColumn($(this).data('column'));
+            if (row && !row.primaryKey) {
+                row.listDisplayField = this.checked;
+            }
+        });
+
+        $('#gen-download-btn').on('click', function () {
+            let payload = form.val('gen-form');
+            payload.parentPermId = $('input[name="parentPermId"]').val();
+            if (!payload.tableName) {
+                layer.msg('请选择数据表', {icon: 2});
+                return;
+            }
+            if (!payload.parentPermId) {
+                layer.msg('请选择上级菜单', {icon: 2});
+                return;
+            }
+            if (!columnRows.length) {
+                layer.msg('请先加载字段配置', {icon: 2});
+                return;
+            }
+            payload.columns = columnRows.map(function (row) {
+                return {
+                    columnName: row.columnName,
+                    columnComment: row.columnComment || '',
+                    javaType: row.javaType,
+                    formField: !!row.formField,
+                    listDisplayField: !!row.listDisplayField,
+                    listQueryField: !!row.listQueryField
+                };
+            });
+            let loading = layer.load();
+            // 调用后台生成 ZIP 并触发浏览器下载。
+            $.ajax({
+                url: MODULE_PATH + '/download',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(payload),
+                xhrFields: {responseType: 'blob'},
+                success: function (blob, status, xhr) {
+                    layer.close(loading);
+                    let disposition = xhr.getResponseHeader('Content-Disposition') || '';
+                    let filename = 'codegen-' + payload.moduleName + '.zip';
+                    let match = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
+                    if (match && match[1]) {
+                        filename = decodeURIComponent(match[1]);
+                    }
+                    let link = document.createElement('a');
+                    link.href = window.URL.createObjectURL(blob);
+                    link.download = filename;
+                    link.click();
+                    window.URL.revokeObjectURL(link.href);
+                    layer.msg('下载已开始', {icon: 1, time: 1000});
+                },
+                error: function (xhr) {
+                    layer.close(loading);
+                    layer.msg(getAjaxErrorMsg(xhr, '生成失败'), {icon: 2});
+                }
+            });
+        });
+    });
+</script>
+</body>
+</html>

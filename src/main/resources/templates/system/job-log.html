@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{include :: header('执行日志')}"></head>
+<style>
+    /* 仅保留抽屉滚动区高度，其余用 layui / pear 类。 */
+    html, body { height: 100%; margin: 0; overflow: hidden; }
+</style>
+<body>
+<!-- 块与块的竖直间隙统一走 layui-col-space，避免 row 负边距贴死下一张卡片。 -->
+<div class="mainBox" style="background-color: whitesmoke; padding: 10px; box-sizing: border-box;">
+    <div class="layui-row layui-col-space10">
+        <div class="layui-col-xs12">
+            <div class="layui-card">
+                <div class="layui-card-header" id="job-log-title">加载中…</div>
+                <div class="layui-card-body">
+                    <div id="job-log-meta" class="layui-text"></div>
+                </div>
+            </div>
+        </div>
+        <div class="layui-col-xs12">
+            <div class="layui-card">
+                <div class="layui-card-body">
+                    <div class="layui-tab layui-tab-brief" lay-filter="job-log-tab">
+                        <ul class="layui-tab-title">
+                            <li class="layui-this" data-run-status="">全部</li>
+                            <li data-run-status="SUCCESS">成功</li>
+                            <li data-run-status="FAILED">失败</li>
+                            <li data-run-status="SKIPPED">跳过</li>
+                        </ul>
+                        <div class="layui-tab-content">
+                            <div class="layui-tab-item layui-show">
+                                <table id="job-log-table" lay-filter="job-log-table"></table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="bottom">
+    <div class="button-container">
+        <button type="button" class="pear-btn pear-btn-sm" id="job-log-close">
+            <i class="layui-icon layui-icon-close"></i>
+            关闭
+        </button>
+    </div>
+</div>
+
+<script type="text/html" id="job-log-status-tpl" th:inline="none">
+{{# if(d.runStatus === 'SUCCESS'){ }}
+    <span class="layui-font-green">成功</span>
+{{# } else if(d.runStatus === 'FAILED'){ }}
+    <span class="layui-font-red">失败</span>
+{{# } else if(d.runStatus === 'SKIPPED'){ }}
+    <span class="layui-font-gray">跳过</span>
+{{# } else { }}
+    <span class="layui-font-gray">—</span>
+{{# } }}
+</script>
+
+<script th:inline="javascript">
+    window.jobLogJobId = /*[[${jobId}]]*/ '';
+    window.jobLogJobName = /*[[${jobName}]]*/ '';
+    window.jobLogJobCode = /*[[${jobCode}]]*/ '';
+</script>
+<th:block th:insert="~{include :: footer}"/>
+<script th:inline="none">
+    layui.use(['common', 'table', 'element', 'jquery', 'layer'], function () {
+        let table = layui.table;
+        let element = layui.element;
+        let $ = layui.jquery;
+        let layer = layui.layer;
+        let MODULE_PATH = apiPath + '/job';
+        let jobId = window.jobLogJobId || '';
+        let jobName = window.jobLogJobName || '';
+        let jobCode = window.jobLogJobCode || '';
+        let currentRunStatus = '';
+
+        function closeJobLogLayer() {
+            let index = parent.layer.getFrameIndex(window.name);
+            parent.layer.close(index);
+        }
+
+        $('#job-log-close').on('click', closeJobLogLayer);
+
+        if (!jobId) {
+            layer.msg('缺少任务ID', {icon: 2, time: 1500});
+            return;
+        }
+
+        $('#job-log-title').text(jobName || '执行日志');
+        let metaParts = [];
+        if (jobCode) {
+            metaParts.push('任务编码: ' + jobCode);
+        }
+        metaParts.push('任务ID: ' + jobId);
+        $('#job-log-meta').text(metaParts.join(' · '));
+
+        function buildWhere() {
+            // 全部 Tab 传空字符串，由后端绑定为 null，避免 Layui where 合并残留旧筛选。
+            return {
+                jobId: jobId,
+                runStatus: currentRunStatus
+            };
+        }
+
+        // 从后台分页加载指定任务的执行记录。
+        table.render({
+            response: TABLE_RESPONSE,
+            elem: '#job-log-table',
+            url: MODULE_PATH + '/logList',
+            where: buildWhere(),
+            page: true,
+            height: 'full-280',
+            cols: [
+                [
+                    {title: '触发方式', field: 'triggerTypeName', align: 'center', width: 90},
+                    {title: '结果', field: 'runStatus', align: 'center', width: 80, templet: '#job-log-status-tpl'},
+                    {title: '开始时间', field: 'startTime', align: 'center', minWidth: 160},
+                    {title: '结束时间', field: 'endTime', align: 'center', minWidth: 160},
+                    {title: '耗时(ms)', field: 'costMs', align: 'center', width: 90},
+                    {title: '摘要', field: 'message', align: 'left', minWidth: 200}
+                ]
+            ],
+            skin: 'line'
+        });
+
+        element.on('tab(job-log-tab)', function (data) {
+            let $li = $(data.elem).find('.layui-tab-title li').eq(data.index);
+            currentRunStatus = $li.attr('data-run-status') || '';
+            // 按 Tab 切换全部 / 成功 / 失败 / 跳过日志列表。
+            table.reload('job-log-table', {
+                where: buildWhere(),
+                page: {curr: 1}
+            });
+        });
+    });
+</script>
+</body>
+</html>

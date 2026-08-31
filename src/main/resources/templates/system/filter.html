@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sa="https://www.thymeleaf.org/extras/sa-token">
+<head th:replace="~{include :: header('访问控制')}"></head>
+<body class="pear-container">
+<div class="layui-card">
+    <div class="layui-card-body">
+        <form class="layui-form" action="">
+            <div class="layui-form-item">
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">策略</label>
+                    <div class="layui-input-inline">
+                        <select name="policyMode">
+                            <option value="">全部</option>
+                            <option value="BLACK">黑名单</option>
+                            <option value="WHITE">白名单</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">类型</label>
+                    <div class="layui-input-inline">
+                        <select name="filterType">
+                            <option value="">全部</option>
+                            <option value="IP">IP</option>
+                            <option value="USER_ID">用户</option>
+                            <option value="DEVICE">设备</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">过滤值</label>
+                    <div class="layui-input-inline">
+                        <input type="text" name="filterValue" maxlength="128" placeholder="IP / 用户ID / 设备标识" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">来源</label>
+                    <div class="layui-input-inline">
+                        <select name="filterSource">
+                            <option value="">全部</option>
+                            <option value="MANUAL">人工</option>
+                            <option value="AUTO">自动</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">状态</label>
+                    <div class="layui-input-inline">
+                        <select name="isEnabled">
+                            <option value="">全部</option>
+                            <option value="1">启用</option>
+                            <option value="0">停用</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <button class="pear-btn pear-btn-md pear-btn-primary" lay-submit lay-filter="filter-query">
+                        <i class="layui-icon layui-icon-search"></i>
+                        查询
+                    </button>
+                    <button type="reset" class="pear-btn pear-btn-md">
+                        <i class="layui-icon layui-icon-refresh"></i>
+                        重置
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="layui-card">
+    <div class="layui-card-body">
+        <table id="filter-table" lay-filter="filter-table"></table>
+    </div>
+</div>
+
+<script type="text/html" id="filter-toolbar">
+    <button sa:hasPermission="system:filter:insert" class="pear-btn pear-btn-primary pear-btn-md" lay-event="add">
+        <i class="layui-icon layui-icon-add-1"></i>
+        新增
+    </button>
+    <button sa:hasPermission="system:filter:delete" class="pear-btn pear-btn-danger pear-btn-md" lay-event="batchRemove">
+        <i class="layui-icon layui-icon-delete"></i>
+        删除
+    </button>
+</script>
+
+<script type="text/html" id="filter-bar">
+    <button sa:hasPermission="system:filter:update" class="pear-btn pear-btn-primary pear-btn-sm" lay-event="edit"><i class="layui-icon layui-icon-edit"></i></button>
+    <button sa:hasPermission="system:filter:delete" class="pear-btn pear-btn-danger pear-btn-sm" lay-event="remove"><i class="layui-icon layui-icon-delete"></i></button>
+</script>
+
+<script type="text/html" id="filter-enabled" th:inline="none">
+{{# if(d.isEnabled == 1){ }}
+    <input sa:hasPermission="system:filter:updateEnabled" type="checkbox" name="isEnabled" value="{{d.filterId}}" lay-skin="switch" lay-text="启用|停用" lay-filter="filter-enabled" checked />
+{{# } else { }}
+    <input sa:hasPermission="system:filter:updateEnabled" type="checkbox" name="isEnabled" value="{{d.filterId}}" lay-skin="switch" lay-text="启用|停用" lay-filter="filter-enabled" />
+{{# } }}
+</script>
+
+<script type="text/html" id="filter-expire" th:inline="none">
+{{# if(d.permanent == 1){ }}
+    永久
+{{# } else { }}
+    {{ d.expireTime || '' }}
+{{# } }}
+</script>
+
+<script type="text/html" id="filter-form">
+    <form class="layui-form" lay-filter="filter-form" action="">
+        <div class="mainBox">
+            <div class="main-container">
+                <input type="hidden" name="filterId">
+                <div class="layui-form-item">
+                    <label class="layui-form-label">策略</label>
+                    <div class="layui-input-block">
+                        <select name="policyMode" lay-verify="required" lay-filter="filter-policy-mode">
+                            <option value="BLACK">黑名单</option>
+                            <option value="WHITE">白名单</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">类型</label>
+                    <div class="layui-input-block">
+                        <select name="filterType" lay-verify="required" lay-filter="filter-type" id="filter-type-select">
+                            <option value="">请选择</option>
+                            <option value="IP">IP</option>
+                            <option value="USER_ID">用户ID</option>
+                            <option value="DEVICE">设备</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">过滤值</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="filterValue" lay-verify="required" maxlength="128" placeholder="IP / 用户ID / 设备标识"
+                               autocomplete="off" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">说明</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="filterDesc" maxlength="255" placeholder="请输入说明" autocomplete="off" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">永久</label>
+                    <div class="layui-input-block">
+                        <input type="checkbox" name="permanentFlag" lay-skin="switch" lay-text="是|否" lay-filter="filter-permanent">
+                    </div>
+                </div>
+                <div class="layui-form-item" id="expire-time-item">
+                    <label class="layui-form-label">过期时间</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="expireTime" id="filter-expire-time" placeholder="请选择过期时间" autocomplete="off" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">状态</label>
+                    <div class="layui-input-block">
+                        <input type="radio" name="isEnabled" value="1" title="启用">
+                        <input type="radio" name="isEnabled" value="0" title="停用" checked>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="bottom">
+            <div class="button-container">
+                <button sa:hasPermissionOr="system:filter:insert,system:filter:update" type="submit" class="pear-btn pear-btn-primary pear-btn-sm" lay-submit lay-filter="filter-save">
+                    <i class="layui-icon layui-icon-ok"></i>
+                    提交
+                </button>
+                <button type="button" class="pear-btn pear-btn-sm" onclick="closeCurrentLayer()">
+                    <i class="layui-icon layui-icon-close"></i>
+                    关闭
+                </button>
+            </div>
+        </div>
+    </form>
+</script>
+
+<th:block th:insert="~{include :: footer}"/>
+<script>
+    layui.use(['common', 'table', 'form', 'jquery', 'laydate'], function () {
+        let table = layui.table;
+        let form = layui.form;
+        let $ = layui.jquery;
+        let laydate = layui.laydate;
+        let MODULE_PATH = apiPath + "/filter";
+        let formMode = 'add';
+        let PERMANENT_EXPIRE = '9999-12-31 23:59:59';
+
+        form.render('select');
+
+        let cols = [
+            [
+                {type: 'checkbox'},
+                {title: '策略', field: 'policyModeName', align: 'center', width: 90},
+                {title: '类型', field: 'filterTypeName', align: 'center', width: 90},
+                {title: '过滤值', field: 'valueLabel', align: 'center', minWidth: 180},
+                {title: '来源', field: 'filterSourceName', align: 'center', width: 90},
+                {title: '说明', field: 'filterDesc', align: 'center', minWidth: 140},
+                {title: '过期时间', field: 'expireTime', align: 'center', width: 170, templet: '#filter-expire'},
+                {title: '状态', field: 'isEnabled', align: 'center', templet: '#filter-enabled', width: 120},
+                {title: '创建时间', field: 'createTime', align: 'center', width: 170},
+                {title: '操作', toolbar: '#filter-bar', align: 'center', width: 120}
+            ]
+        ];
+
+        // 从后台分页加载访问控制列表。
+        table.render({
+            response: TABLE_RESPONSE,
+            elem: '#filter-table',
+            url: MODULE_PATH + '/list',
+            page: true,
+            cols: cols,
+            skin: 'line',
+            toolbar: '#filter-toolbar',
+            defaultToolbar: [{
+                title: '刷新',
+                layEvent: 'refresh',
+                icon: 'layui-icon-refresh'
+            }, 'filter', 'print', 'exports'],
+            done: function () {
+                form.render('checkbox');
+            }
+        });
+
+        table.on('tool(filter-table)', function (obj) {
+            if (obj.event === 'remove') {
+                window.remove(obj);
+            } else if (obj.event === 'edit') {
+                window.edit(obj);
+            }
+        });
+
+        table.on('toolbar(filter-table)', function (obj) {
+            if (obj.event === 'add') {
+                window.add();
+            } else if (obj.event === 'refresh') {
+                window.refresh();
+            } else if (obj.event === 'batchRemove') {
+                window.batchRemove(obj);
+            }
+        });
+
+        form.on('submit(filter-query)', function (data) {
+            table.reload('filter-table', {where: data.field});
+            return false;
+        });
+
+        form.on('switch(filter-enabled)', function (obj) {
+            let isEnabled = obj.elem.checked ? 1 : 0;
+            // 调用后台切换访问控制启停。
+            patchJson(MODULE_PATH + '/updateEnabled', {
+                filterId: this.value,
+                isEnabled: isEnabled
+            }, {
+                defaultMsg: '状态更新失败',
+                success: function (result) {
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg, {icon: 1, time: 1000});
+                    } else {
+                        obj.elem.checked = !obj.elem.checked;
+                        form.render('checkbox');
+                        layer.msg(result.msg || '状态更新失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    obj.elem.checked = !obj.elem.checked;
+                    form.render('checkbox');
+                }
+            });
+        });
+
+        function syncExpireUi(layero, permanent) {
+            let $expireItem = layero.find('#expire-time-item');
+            let $expireInput = layero.find('[name="expireTime"]');
+            if (permanent) {
+                $expireInput.val(PERMANENT_EXPIRE);
+                $expireItem.hide();
+            } else {
+                $expireItem.show();
+                if ($expireInput.val() === PERMANENT_EXPIRE) {
+                    $expireInput.val('');
+                }
+            }
+        }
+
+        // 白名单仅开放 IP：切换策略时限制类型选项。
+        function syncTypeOptionsForMode(layero, policyMode, selectedType) {
+            let $type = layero.find('[name="filterType"]');
+            let html = '<option value="">请选择</option><option value="IP">IP</option>';
+            if (policyMode !== 'WHITE') {
+                html += '<option value="USER_ID">用户ID</option><option value="DEVICE">设备</option>';
+            }
+            $type.html(html);
+            let type = selectedType || 'IP';
+            if (policyMode === 'WHITE') {
+                type = 'IP';
+            }
+            $type.val(type);
+            form.render('select');
+        }
+
+        form.on('switch(filter-permanent)', function (obj) {
+            syncExpireUi($(obj.elem).closest('.layui-form'), obj.elem.checked);
+        });
+
+        form.on('select(filter-policy-mode)', function (data) {
+            syncTypeOptionsForMode($(data.elem).closest('.layui-form'), data.value, null);
+        });
+
+        function saveFilter(data) {
+            let payload = Object.assign({}, data.field);
+            let permanent = data.form.querySelector('[name="permanentFlag"]')
+                && data.form.querySelector('[name="permanentFlag"]').checked;
+            if (permanent) {
+                payload.expireTime = PERMANENT_EXPIRE;
+            }
+            if (!payload.expireTime) {
+                layer.msg('请选择过期时间或设为永久', {icon: 2, time: 1200});
+                return;
+            }
+            delete payload.permanentFlag;
+            let url = formMode === 'add' ? MODULE_PATH + '/add' : MODULE_PATH + '/update';
+            let loading = layer.load();
+            // 按表单模式调用后台新增或修改访问控制。
+            (formMode === 'add' ? postJson : putJson)(url, payload, {
+                defaultMsg: '操作失败',
+                success: function (result) {
+                    layer.close(loading);
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                            layer.closeAll('page');
+                            table.reload('filter-table');
+                        });
+                    } else {
+                        layer.msg(result.msg || '操作失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    layer.close(loading);
+                }
+            });
+        }
+
+        form.on('submit(filter-save)', function (data) {
+            saveFilter(data);
+            return false;
+        });
+
+        function openFilterForm(mode, row) {
+            formMode = mode;
+            layer.open({
+                type: 1,
+                title: mode === 'add' ? '新增访问控制' : '修改访问控制',
+                offset: mode === 'add' ? 'b' : 'r',
+                anim: mode === 'add' ? 'slideUp' : 'slideLeft',
+                shade: 0.1,
+                shadeClose: true,
+                // 编辑字段中等偏少，用短侧栏；新增用底部抽屉。
+                area: mode === 'add' ? ['720px', '60%'] : ['500px', '60%'],
+                content: $('#filter-form').html(),
+                success: function (layero) {
+                    laydate.render({
+                        elem: layero.find('#filter-expire-time')[0],
+                        type: 'datetime',
+                        format: 'yyyy-MM-dd HH:mm:ss'
+                    });
+                    form.render();
+                    if (mode === 'edit' && row) {
+                        let permanent = row.permanent == 1;
+                        let policyMode = row.policyMode || 'BLACK';
+                        syncTypeOptionsForMode(layero, policyMode, row.filterType);
+                        form.val('filter-form', {
+                            filterId: row.filterId,
+                            policyMode: policyMode,
+                            filterType: row.filterType,
+                            filterValue: row.filterValue,
+                            filterDesc: row.filterDesc || '',
+                            expireTime: row.expireTime || '',
+                            isEnabled: String(row.isEnabled != null ? row.isEnabled : 0)
+                        });
+                        layero.find('[name="permanentFlag"]').prop('checked', permanent);
+                        syncExpireUi(layero, permanent);
+                    } else {
+                        syncTypeOptionsForMode(layero, 'BLACK', 'IP');
+                        form.val('filter-form', {
+                            filterId: '',
+                            policyMode: 'BLACK',
+                            filterType: 'IP',
+                            filterValue: '',
+                            filterDesc: '',
+                            expireTime: '',
+                            isEnabled: '0'
+                        });
+                        layero.find('[name="permanentFlag"]').prop('checked', false);
+                        syncExpireUi(layero, false);
+                    }
+                    form.render('checkbox');
+                    form.render('select');
+                    form.render('radio');
+                }
+            });
+        }
+
+        window.add = function () {
+            openFilterForm('add', null);
+        };
+
+        window.closeCurrentLayer = function () {
+            layer.close(layer.index);
+        };
+
+        window.edit = function (obj) {
+            openFilterForm('edit', obj.data);
+        };
+
+        window.remove = function (obj) {
+            layer.confirm('确定要删除该访问控制吗？', {icon: 3, title: '提示'}, function (index) {
+                layer.close(index);
+                let loading = layer.load();
+                // 调用后台删除访问控制。
+                deleteJson(MODULE_PATH + '/delete', {ids: obj.data.filterId}, {
+                    defaultMsg: '删除失败',
+                    success: function (result) {
+                        layer.close(loading);
+                        if (isAjaxSuccess(result)) {
+                            layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                                obj.del();
+                            });
+                        } else {
+                            layer.msg(result.msg || '删除失败', {icon: 2, time: 1000});
+                        }
+                    },
+                    error: function () {
+                        layer.close(loading);
+                    }
+                });
+            });
+        };
+
+        window.batchRemove = function (obj) {
+            let ids = getCheckedFieldIds(obj, 'filterId');
+            if (ids === '') {
+                layer.msg('未选中数据', {icon: 3, time: 1000});
+                return;
+            }
+            layer.confirm('确定要删除选中的访问控制吗？', {icon: 3, title: '提示'}, function (index) {
+                layer.close(index);
+                let loading = layer.load();
+                // 调用后台批量删除访问控制。
+                deleteJson(MODULE_PATH + '/delete', {ids: ids}, {
+                    defaultMsg: '删除失败',
+                    success: function (result) {
+                        layer.close(loading);
+                        if (isAjaxSuccess(result)) {
+                            layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                                table.reload('filter-table');
+                            });
+                        } else {
+                            layer.msg(result.msg || '删除失败', {icon: 2, time: 1000});
+                        }
+                    },
+                    error: function () {
+                        layer.close(loading);
+                    }
+                });
+            });
+        };
+
+        window.refresh = function () {
+            table.reload('filter-table');
+        };
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+# 开发环境（默认 spring.profiles.default=dev，或 --spring.profiles.active=dev）
+server:
+  port: 8085
+
+spring:
+  threads:
+    virtual:
+      # JDK 25 下先在开发环境验证虚拟线程与登录态、日志上下文的兼容性。
+      enabled: true
+  datasource:
+    # 应用和历史 datetime 数据按中国本地时间处理；serverTimezone 与 app.timezone 对齐。
+    url: jdbc:mysql://127.0.0.1:3306/admin_layui?useSSL=false&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=utf-8&serverTimezone=${app.timezone}
+    # url: jdbc:mysql://43.138.111.127:3306/md_test?useSSL=false&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=utf-8&serverTimezone=${app.timezone}
+    username: admin_layui
+    password: xxxxxxx
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: HikariCP
+      minimum-idle: 5
+      maximum-pool-size: 15
+      idle-timeout: 30000
+      connection-test-query: SELECT 1
+      # Hikari 仅支持单条 init SQL；utf8mb4 仍由 JDBC URL characterEncoding 保证。
+      # 用偏移量而非 IANA 名：本机 MySQL 未导入时区表时 SET time_zone='Asia/Shanghai' 会失败。
+      # Java/Jackson/JDBC 仍读 app.timezone；此处钉死会话 NOW() 为东八区。
+      connection-init-sql: SET time_zone = '+08:00'
+      connection-timeout: 5000
+      max-lifetime: 1800000
+      auto-commit: true
+  devtools:
+    restart:
+      enabled: true
+      additional-paths: src/main
+      exclude: test/**
+  thymeleaf:
+    # 开发直接读源码目录，改 HTML 刷新即可，不必等 classpath 复制/重启。
+    cache: false
+    prefix: file:src/main/resources/templates/
+  data:
+    redis:
+      # Sa-Token 整合 Redis（本地单机必需配置）。
+      host: 127.0.0.1
+      port: 6379
+      database: 0
+      # Redis 无密码可留空；有密码请填写。
+      password: 123456
+      connect-timeout: 3s
+      timeout: 3s
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: 3s
+
+mybatis-plus:
+  configuration:
+    # 勿用 StdOutImpl；SQL 由 logging.level.com.ylmao.admin.mapper 控制
+    # log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# 开发环境日志：默认安静，按需将 com.ylmao.admin.mapper 改为 debug 查看 SQL
+logging:
+  level:
+    root: info
+    com.ylmao.admin: info
+    org.springframework.web: warn
+    org.springframework.web.servlet.PageNotFound: error
+    org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver: error
+    com.ylmao.admin.mapper: info
+
+# 开发环境开启在线接口文档（springdoc）；生产见 application-prod.yml。
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+  show-actuator: false

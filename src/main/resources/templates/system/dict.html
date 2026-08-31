@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sa="https://www.thymeleaf.org/extras/sa-token">
+<head th:replace="~{include :: header('数据字典')}"></head>
+<body class="pear-container">
+<!-- 字典页面拆成上下两行、左右两列，筛选区和列表区各自独立。 -->
+<div class="layui-row layui-col-space10">
+    <div class="layui-col-md6">
+        <div class="layui-card">
+            <div class="layui-card-body">
+                <form class="layui-form" action="">
+                    <div class="layui-form-item">
+                        <div class="layui-form-item layui-inline">
+                            <label class="layui-form-label">字典名称</label>
+                            <div class="layui-input-inline">
+                                <input type="text" name="dictTypeName" maxlength="100" placeholder="请输入字典名称" class="layui-input">
+                            </div>
+                        </div>
+                        <div class="layui-form-item layui-inline">
+                            <button class="pear-btn pear-btn-md pear-btn-primary" lay-submit lay-filter="dict-type-query">
+                                <i class="layui-icon layui-icon-search"></i>
+                                查询
+                            </button>
+                            <button type="reset" class="pear-btn pear-btn-md">
+                                <i class="layui-icon layui-icon-refresh"></i>
+                                重置
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="layui-col-md6">
+        <div class="layui-card">
+            <div class="layui-card-body">
+                <form class="layui-form" action="">
+                    <div class="layui-form-item">
+                        <div class="layui-form-item layui-inline">
+                            <label class="layui-form-label">数据标签</label>
+                            <div class="layui-input-inline">
+                                <input type="text" name="dictDataLabel" maxlength="100" placeholder="请选择左侧字典" class="layui-input">
+                            </div>
+                        </div>
+                        <div class="layui-form-item layui-inline">
+                            <button class="pear-btn pear-btn-md pear-btn-primary" lay-submit lay-filter="dict-data-query">
+                                <i class="layui-icon layui-icon-search"></i>
+                                查询
+                            </button>
+                            <button type="reset" class="pear-btn pear-btn-md">
+                                <i class="layui-icon layui-icon-refresh"></i>
+                                重置
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="layui-row layui-col-space10">
+    <div class="layui-col-md6">
+        <div class="layui-card">
+            <div class="layui-card-body">
+                <table id="dict-type-table" lay-filter="dict-type-table"></table>
+            </div>
+        </div>
+    </div>
+    <div class="layui-col-md6">
+        <div class="layui-card">
+            <div class="layui-card-body">
+                <table id="dict-data-table" lay-filter="dict-data-table"></table>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+
+<script type="text/html" id="dict-type-toolbar">
+    <button sa:hasPermission="system:dictType:insert" class="pear-btn pear-btn-primary pear-btn-md" lay-event="add">
+        <i class="layui-icon layui-icon-add-1"></i>
+        新增
+    </button>
+    <button sa:hasPermission="system:dictType:delete" class="pear-btn pear-btn-danger pear-btn-md" lay-event="batchRemove">
+        <i class="layui-icon layui-icon-delete"></i>
+        删除
+    </button>
+</script>
+
+<script type="text/html" id="dict-type-bar">
+    <button sa:hasPermission="system:dictType:update" class="pear-btn pear-btn-primary pear-btn-sm" lay-event="edit"><i class="layui-icon layui-icon-edit"></i></button>
+    <button sa:hasPermission="system:dictData:select" class="pear-btn pear-btn-warming pear-btn-sm" lay-event="details"><i class="layui-icon layui-icon-transfer"></i></button>
+    <button sa:hasPermission="system:dictType:delete" class="pear-btn pear-btn-danger pear-btn-sm" lay-event="remove"><i class="layui-icon layui-icon-delete"></i></button>
+</script>
+
+<script type="text/html" id="dict-type-enable" th:inline="none">
+{{# if(d.isEnabled == 1){ }}
+    <input sa:hasPermission="system:dictType:updateEnabled" type="checkbox" value="{{d.dictTypeId}}" lay-skin="switch" lay-text="启用|禁用" lay-filter="dict-type-enable" checked>
+{{# } else { }}
+    <input sa:hasPermission="system:dictType:updateEnabled" type="checkbox" value="{{d.dictTypeId}}" lay-skin="switch" lay-text="启用|禁用" lay-filter="dict-type-enable">
+{{# } }}
+</script>
+
+<script type="text/html" id="dict-data-toolbar">
+    <button sa:hasPermission="system:dictData:insert" class="pear-btn pear-btn-primary pear-btn-md" lay-event="add">
+        <i class="layui-icon layui-icon-add-1"></i>
+        新增
+    </button>
+    <button sa:hasPermission="system:dictData:delete" class="pear-btn pear-btn-danger pear-btn-md" lay-event="batchRemove">
+        <i class="layui-icon layui-icon-delete"></i>
+        删除
+    </button>
+</script>
+
+<script type="text/html" id="dict-data-bar">
+    <button sa:hasPermission="system:dictData:update" class="pear-btn pear-btn-primary pear-btn-sm" lay-event="edit"><i class="layui-icon layui-icon-edit"></i></button>
+    <button sa:hasPermission="system:dictData:delete" class="pear-btn pear-btn-danger pear-btn-sm" lay-event="remove"><i class="layui-icon layui-icon-delete"></i></button>
+</script>
+
+<script type="text/html" id="dict-data-enable" th:inline="none">
+{{# if(d.isEnabled == 1){ }}
+    <input sa:hasPermission="system:dictData:updateEnabled" type="checkbox" value="{{d.dictDataId}}" lay-skin="switch" lay-text="启用|禁用" lay-filter="dict-data-enable" checked>
+{{# } else { }}
+    <input sa:hasPermission="system:dictData:updateEnabled" type="checkbox" value="{{d.dictDataId}}" lay-skin="switch" lay-text="启用|禁用" lay-filter="dict-data-enable">
+{{# } }}
+</script>
+
+<script type="text/html" id="dict-data-default" th:inline="none">
+{{# if(d.isDefault == '1'){ }}
+    <input sa:hasPermission="system:dictData:updateDefault" type="checkbox" value="{{d.dictDataId}}" lay-skin="switch" lay-text="是|否" lay-filter="dict-data-default" checked>
+{{# } else { }}
+    <input sa:hasPermission="system:dictData:updateDefault" type="checkbox" value="{{d.dictDataId}}" lay-skin="switch" lay-text="是|否" lay-filter="dict-data-default">
+{{# } }}
+</script>
+
+<script type="text/html" id="dict-type-form">
+    <form class="layui-form" lay-filter="dict-type-form">
+        <!-- 字典类型抽屉表单，新增和修改共用同一套字段。 -->
+        <div class="mainBox">
+            <div class="main-container">
+        <input type="hidden" name="dictTypeId">
+        <div class="layui-form-item">
+            <label class="layui-form-label">字典名称</label>
+            <div class="layui-input-block">
+                <input type="text" name="dictTypeName" lay-verify="required" maxlength="100" placeholder="请输入字典名称" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">字典编码</label>
+            <div class="layui-input-block">
+                <input type="text" name="dictTypeCode" lay-verify="required|codeFormat" maxlength="100" placeholder="请输入字典编码" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">排序</label>
+            <div class="layui-input-block">
+                <input type="number" name="orderNum" lay-verify="required|number" placeholder="请输入排序号"
+                       autocomplete="off" class="layui-input" value="1">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">状态</label>
+            <div class="layui-input-block">
+                <input type="radio" name="isEnabled" value="1" title="启用">
+                <input type="radio" name="isEnabled" value="0" title="禁用" checked>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">类型说明</label>
+            <div class="layui-input-block">
+                <textarea name="dictTypeDesc" maxlength="500" placeholder="请输入字典类型说明" class="layui-textarea"></textarea>
+            </div>
+        </div>
+            </div>
+        </div>
+        <div class="bottom">
+            <div class="button-container">
+                <button sa:hasPermissionOr="system:dictType:insert,system:dictType:update" type="submit" class="pear-btn pear-btn-primary pear-btn-sm" lay-submit lay-filter="dict-type-save">
+                    <i class="layui-icon layui-icon-ok"></i>
+                    提交
+                </button>
+                <button type="button" class="pear-btn pear-btn-sm" onclick="window.closeCurrentLayer()">
+                    <i class="layui-icon layui-icon-close"></i>
+                    关闭
+                </button>
+            </div>
+        </div>
+    </form>
+</script>
+
+<script type="text/html" id="dict-data-form">
+    <form class="layui-form" lay-filter="dict-data-form">
+        <!-- 字典数据抽屉表单，字典编码来自当前选中的左侧字典类型。 -->
+        <div class="mainBox">
+            <div class="main-container">
+        <input type="hidden" name="dictDataId">
+        <input type="hidden" name="dictTypeCode">
+        <div class="layui-form-item">
+            <label class="layui-form-label">数据标签</label>
+            <div class="layui-input-block">
+                <input type="text" name="dictDataLabel" lay-verify="required" maxlength="100" placeholder="请输入数据标签" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">数据值</label>
+            <div class="layui-input-block">
+                <input type="text" name="dictDataValue" lay-verify="required" maxlength="100" placeholder="请输入数据值" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">排序</label>
+            <div class="layui-input-block">
+                <input type="number" name="orderNum" lay-verify="required|number" placeholder="请输入排序号"
+                       autocomplete="off" class="layui-input" value="1">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">状态</label>
+            <div class="layui-input-block">
+                <input type="radio" name="isEnabled" value="1" title="启用">
+                <input type="radio" name="isEnabled" value="0" title="禁用" checked>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">数据说明</label>
+            <div class="layui-input-block">
+                <textarea name="dictDataDesc" maxlength="500" placeholder="请输入字典数据说明" class="layui-textarea"></textarea>
+            </div>
+        </div>
+            </div>
+        </div>
+        <div class="bottom">
+            <div class="button-container">
+                <button sa:hasPermissionOr="system:dictData:insert,system:dictData:update" type="submit" class="pear-btn pear-btn-primary pear-btn-sm" lay-submit lay-filter="dict-data-save">
+                    <i class="layui-icon layui-icon-ok"></i>
+                    提交
+                </button>
+                <button type="button" class="pear-btn pear-btn-sm" onclick="window.closeCurrentLayer()">
+                    <i class="layui-icon layui-icon-close"></i>
+                    关闭
+                </button>
+            </div>
+        </div>
+    </form>
+</script>
+<th:block th:insert="~{include :: footer}"/>
+<script>
+    /* global layui, apiPath */
+    layui.use(['common', 'table', 'form', 'jquery'], function () {
+        let table = layui.table;
+        let form = layui.form;
+        let $ = layui.jquery;
+        let MODULE_PATH = apiPath + '/dictType';
+        let DATA_MODULE_PATH = apiPath + '/dictData';
+        let currentDictType = null;
+        let currentLayerIndex = null;
+
+        form.verify({
+            codeFormat: function (value) {
+                // 普通编码只允许字母、数字、下划线和中划线。
+                if (value && !/^[A-Za-z0-9_-]+$/.test(value)) {
+                    return '编码只能包含字母、数字、下划线和中划线';
+                }
+            }
+        });
+
+        let dictTypeCols = [
+            [
+                {type: 'checkbox'},
+                {title: '字典名称', field: 'dictTypeName', align: 'center'},
+                {title: '字典编码', field: 'dictTypeCode', align: 'center'},
+                {title: '排序', field: 'orderNum', align: 'center', width: 90},
+                {title: '状态', field: 'isEnabled', align: 'center', templet: '#dict-type-enable', width: 110},
+                {title: '类型说明', field: 'dictTypeDesc', align: 'center'},
+                {title: '操作', toolbar: '#dict-type-bar', align: 'center', width: 170}
+            ]
+        ];
+
+        let dictDataCols = [
+            [
+                {type: 'checkbox'},
+                {title: '数据标签', field: 'dictDataLabel', align: 'center'},
+                {title: '数据值', field: 'dictDataValue', align: 'center'},
+                {title: '排序', field: 'orderNum', align: 'center', width: 90},
+                {title: '默认', field: 'isDefault', align: 'center', templet: '#dict-data-default', width: 100},
+                {title: '状态', field: 'isEnabled', align: 'center', templet: '#dict-data-enable', width: 110},
+                {title: '数据说明', field: 'dictDataDesc', align: 'center'},
+                {title: '操作', toolbar: '#dict-data-bar', align: 'center', width: 130}
+            ]
+        ];
+
+        // 从后台分页加载字典类型列表。
+        table.render({
+            response: TABLE_RESPONSE,
+            elem: '#dict-type-table',
+            id: 'dict-type-table',
+            url: MODULE_PATH + '/list',
+            page: true,
+            cols: dictTypeCols,
+            skin: 'line',
+            toolbar: '#dict-type-toolbar',
+            defaultToolbar: [{
+                title: '刷新',
+                layEvent: 'refresh',
+                icon: 'layui-icon-refresh'
+            }, 'filter', 'print', 'exports'],
+            done: function () {
+                form.render('checkbox');
+            }
+        });
+
+        // 从后台分页加载当前类型下的字典数据。
+        table.render({
+            response: TABLE_RESPONSE,
+            elem: '#dict-data-table',
+            id: 'dict-data-table',
+            url: DATA_MODULE_PATH + '/list',
+            where: {dictTypeCode: ''},
+            page: true,
+            cols: dictDataCols,
+            skin: 'line',
+            toolbar: '#dict-data-toolbar',
+            done: function () {
+                form.render('checkbox');
+            }
+        });
+
+        table.on('tool(dict-type-table)', function (obj) {
+            if (obj.event === 'remove') {
+                window.removeType(obj);
+            } else if (obj.event === 'edit') {
+                window.editType(obj);
+            } else if (obj.event === 'details') {
+                window.renderData(obj.data);
+            }
+        });
+
+        table.on('toolbar(dict-type-table)', function (obj) {
+            if (obj.event === 'add') {
+                window.addType();
+            } else if (obj.event === 'refresh') {
+                table.reload('dict-type-table');
+            } else if (obj.event === 'batchRemove') {
+                window.batchRemoveType();
+            }
+        });
+
+        table.on('tool(dict-data-table)', function (obj) {
+            if (obj.event === 'remove') {
+                window.removeData(obj);
+            } else if (obj.event === 'edit') {
+                window.editData(obj);
+            }
+        });
+
+        table.on('toolbar(dict-data-table)', function (obj) {
+            if (obj.event === 'add') {
+                window.addData();
+            } else if (obj.event === 'refresh') {
+                window.refreshData();
+            } else if (obj.event === 'batchRemove') {
+                window.batchRemoveData();
+            }
+        });
+
+        form.on('submit(dict-type-query)', function (data) {
+            table.reload('dict-type-table', {page: {curr: 1}, where: data.field});
+            return false;
+        });
+
+        form.on('submit(dict-data-query)', function (data) {
+            if (!currentDictType) {
+                layer.msg('请先选择左侧字典类型', {icon: 2, time: 1000});
+                return false;
+            }
+            data.field.dictTypeCode = currentDictType.dictTypeCode;
+            table.reload('dict-data-table', {page: {curr: 1}, where: data.field});
+            return false;
+        });
+
+        form.on('switch(dict-type-enable)', function (obj) {
+            updateTypeStatus(obj);
+        });
+
+        form.on('switch(dict-data-enable)', function (obj) {
+            updateDataStatus(obj);
+        });
+
+        form.on('switch(dict-data-default)', function (obj) {
+            updateDataDefault(obj);
+        });
+
+        form.on('submit(dict-type-save)', function (data) {
+            saveType(data.field);
+            return false;
+        });
+
+        form.on('submit(dict-data-save)', function (data) {
+            saveData(data.field);
+            return false;
+        });
+
+        window.renderData = function (row) {
+            currentDictType = row;
+            table.reload('dict-data-table', {
+                page: {curr: 1},
+                where: {dictTypeCode: row.dictTypeCode}
+            });
+        };
+
+        window.addType = function () {
+            openTypeForm('add', null);
+        };
+
+        window.editType = function (obj) {
+            openTypeForm('edit', obj.data);
+        };
+
+        window.addData = function () {
+            if (!currentDictType) {
+                layer.msg('请先选择左侧字典类型', {icon: 2, time: 1000});
+                return;
+            }
+            openDataForm('add', null);
+        };
+
+        window.editData = function (obj) {
+            openDataForm('edit', obj.data);
+        };
+
+        window.closeCurrentLayer = function () {
+            layer.close(currentLayerIndex);
+        };
+
+        function openTypeForm(mode, row) {
+            currentLayerIndex = layer.open({
+                type: 1,
+                title: mode === 'add' ? '新增字典类型' : '修改字典类型',
+                offset: mode === 'add' ? 'b' : 'r',
+                anim: mode === 'add' ? 'slideUp' : 'slideLeft',
+                area: mode === 'add' ? ['700px', '55%'] : ['520px', '55%'],
+                shade: 0.1,
+                shadeClose: true,
+                content: $('#dict-type-form').html(),
+                success: function (layero) {
+                    form.render();
+                    // 新增和修改复用同一表单，修改时回填当前行数据。
+                    form.val('dict-type-form', mode === 'edit' && row ? row : {
+                        dictTypeId: '',
+                        dictTypeName: '',
+                        dictTypeCode: '',
+                        orderNum: 1,
+                        isEnabled: '0',
+                        dictTypeDesc: ''
+                    });
+                    if (mode === 'edit' && row) {
+                        layero.find('[name="dictTypeCode"]').attr('data-original-code', row.dictTypeCode);
+                    }
+                }
+            });
+        }
+
+        function openDataForm(mode, row) {
+            currentLayerIndex = layer.open({
+                type: 1,
+                title: mode === 'add' ? '新增字典数据' : '修改字典数据',
+                offset: mode === 'add' ? 'b' : 'r',
+                anim: mode === 'add' ? 'slideUp' : 'slideLeft',
+                area: mode === 'add' ? ['700px', '55%'] : ['520px', '55%'],
+                shade: 0.1,
+                shadeClose: true,
+                content: $('#dict-data-form').html(),
+                success: function (layero) {
+                    form.render();
+                    if (mode === 'edit' && row) {
+                        layero.find('[name="dictDataLabel"]').attr('data-original-label', row.dictDataLabel);
+                        layero.find('[name="dictDataValue"]').attr('data-original-value', row.dictDataValue);
+                    }
+                    // 字典数据必须绑定当前左侧选中的字典编码。
+                    form.val('dict-data-form', mode === 'edit' && row ? row : {
+                        dictDataId: '',
+                        dictTypeCode: currentDictType.dictTypeCode,
+                        dictDataLabel: '',
+                        dictDataValue: '',
+                        orderNum: 1,
+                        isEnabled: '0',
+                        dictDataDesc: ''
+                    });
+                }
+            });
+        }
+
+        function checkDictTypeCodeUnique(dictTypeCode, callback) {
+            // 调用后台校验字典类型编码是否已存在。
+            checkUnique(MODULE_PATH + '/checkCode', {dictTypeCode: dictTypeCode}, callback);
+        }
+
+        function saveType(field) {
+            let originalCode = $('[lay-filter="dict-type-form"] [name="dictTypeCode"]').attr('data-original-code');
+            if (field.dictTypeId && originalCode === field.dictTypeCode) {
+                doSaveType(field);
+                return;
+            }
+            checkDictTypeCodeUnique(field.dictTypeCode, function (unique) {
+                if (unique) {
+                    doSaveType(field);
+                } else {
+                    layer.msg('字典编码已存在', {icon: 2, time: 1000});
+                }
+            });
+        }
+
+        function doSaveType(field) {
+            let loading = layer.load();
+            // 按表单是否带类型 ID 决定新增或修改字典类型。
+            (field.dictTypeId ? putJson : postJson)(MODULE_PATH + (field.dictTypeId ? '/update' : '/add'), field, {
+                defaultMsg: '操作失败',
+                success: function (result) {
+                    layer.close(loading);
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                            layer.close(currentLayerIndex);
+                            table.reload('dict-type-table');
+                            if (currentDictType && field.dictTypeId === currentDictType.dictTypeId) {
+                                // 字典类型修改后清空右侧选择，避免继续使用修改前的字典编码。
+                                currentDictType = null;
+                                table.reload('dict-data-table', {where: {dictTypeCode: ''}});
+                            }
+                        });
+                    } else {
+                        layer.msg(result.msg || '操作失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    layer.close(loading);
+                }
+            });
+        }
+
+        function checkDictDataLabelUnique(dictTypeCode, dictDataLabel, callback) {
+            // 调用后台校验字典数据标签是否已存在。
+            checkUnique(DATA_MODULE_PATH + '/checkLabel', {dictTypeCode: dictTypeCode, dictDataLabel: dictDataLabel}, callback);
+        }
+
+        function checkDictDataValueUnique(dictTypeCode, dictDataValue, callback) {
+            // 调用后台校验字典数据值是否已存在。
+            checkUnique(DATA_MODULE_PATH + '/checkValue', {dictTypeCode: dictTypeCode, dictDataValue: dictDataValue}, callback);
+        }
+
+        function saveData(field) {
+            let $form = $('[lay-filter="dict-data-form"]');
+            let originalLabel = $form.find('[name="dictDataLabel"]').attr('data-original-label');
+            let originalValue = $form.find('[name="dictDataValue"]').attr('data-original-value');
+            let labelUnchanged = field.dictDataId && originalLabel === field.dictDataLabel;
+            let valueUnchanged = field.dictDataId && originalValue === field.dictDataValue;
+
+            function doSaveData() {
+                let loading = layer.load();
+                // 按表单是否带数据 ID 决定新增或修改字典数据。
+                (field.dictDataId ? putJson : postJson)(DATA_MODULE_PATH + (field.dictDataId ? '/update' : '/add'), field, {
+                    defaultMsg: '操作失败',
+                    success: function (result) {
+                        layer.close(loading);
+                        if (isAjaxSuccess(result)) {
+                            layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                                layer.close(currentLayerIndex);
+                                window.refreshData();
+                            });
+                        } else {
+                            layer.msg(result.msg || '操作失败', {icon: 2, time: 1000});
+                        }
+                    },
+                    error: function () {
+                        layer.close(loading);
+                    }
+                });
+            }
+
+            function checkValueThenSave() {
+                if (valueUnchanged) {
+                    doSaveData();
+                    return;
+                }
+                checkDictDataValueUnique(field.dictTypeCode, field.dictDataValue, function (unique) {
+                    if (unique) {
+                        doSaveData();
+                    } else {
+                        layer.msg('同一字典类型下数据值已存在', {icon: 2, time: 1000});
+                    }
+                });
+            }
+
+            if (labelUnchanged) {
+                checkValueThenSave();
+                return;
+            }
+            checkDictDataLabelUnique(field.dictTypeCode, field.dictDataLabel, function (unique) {
+                if (unique) {
+                    checkValueThenSave();
+                } else {
+                    layer.msg('同一字典类型下数据标签已存在', {icon: 2, time: 1000});
+                }
+            });
+        }
+
+        window.removeType = function (obj) {
+            // 删除字典类型会级联删除子数据，确认文案直接提示影响范围。
+            layer.confirm('确定要删除该字典类型吗？如果存在子数据，子数据也会一并删除。', {icon: 3, title: '提示'}, function (index) {
+                layer.close(index);
+                requestDelete(MODULE_PATH + '/delete', obj.data.dictTypeId, function () {
+                    obj.del();
+                    currentDictType = null;
+                    table.reload('dict-data-table', {where: {dictTypeCode: ''}});
+                });
+            });
+        };
+
+        window.batchRemoveType = function () {
+            let checkData = table.checkStatus('dict-type-table').data;
+            if (checkData.length === 0) {
+                layer.msg('请选择要删除的字典类型', {icon: 2, time: 1000});
+                return;
+            }
+            let ids = checkData.map(function (item) { return item.dictTypeId; }).join(',');
+            // 批量删除字典类型同样会级联删除子数据，避免用户误删。
+            layer.confirm('确定要删除选中的字典类型吗？如果存在子数据，子数据也会一并删除。', {icon: 3, title: '提示'}, function (index) {
+                layer.close(index);
+                requestDelete(MODULE_PATH + '/delete', ids, function () {
+                    table.reload('dict-type-table');
+                    currentDictType = null;
+                    table.reload('dict-data-table', {where: {dictTypeCode: ''}});
+                });
+            });
+        };
+
+        window.removeData = function (obj) {
+            layer.confirm('确定要删除该字典数据吗？', {icon: 3, title: '提示'}, function (index) {
+                layer.close(index);
+                requestDelete(DATA_MODULE_PATH + '/delete', obj.data.dictDataId, function () {
+                    obj.del();
+                });
+            });
+        };
+
+        window.batchRemoveData = function () {
+            let checkData = table.checkStatus('dict-data-table').data;
+            if (checkData.length === 0) {
+                layer.msg('请选择要删除的字典数据', {icon: 2, time: 1000});
+                return;
+            }
+            let ids = checkData.map(function (item) { return item.dictDataId; }).join(',');
+            layer.confirm('确定要删除选中的字典数据吗？', {icon: 3, title: '提示'}, function (index) {
+                layer.close(index);
+                requestDelete(DATA_MODULE_PATH + '/delete', ids, window.refreshData);
+            });
+        };
+
+        function requestDelete(url, ids, callback) {
+            let loading = layer.load();
+            // 调用后台删除字典类型或字典数据。
+            deleteJson(url, {ids: ids}, {
+                defaultMsg: '删除失败',
+                success: function (result) {
+                    layer.close(loading);
+                    if (isAjaxSuccess(result)) {
+                        layer.msg(result.msg, {icon: 1, time: 1000}, callback);
+                    } else {
+                        layer.msg(result.msg || '删除失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    layer.close(loading);
+                }
+            });
+        }
+
+        function updateTypeStatus(obj) {
+            // isEnabled 使用布尔语义，1 表示启用，0 表示禁用。
+            updateSwitch(obj, MODULE_PATH + '/updateEnabled', {
+                dictTypeId: obj.value,
+                isEnabled: obj.elem.checked ? 1 : 0
+            });
+        }
+
+        function updateDataStatus(obj) {
+            updateSwitch(obj, DATA_MODULE_PATH + '/updateEnabled', {
+                dictDataId: obj.value,
+                isEnabled: obj.elem.checked ? 1 : 0
+            });
+        }
+
+        function updateDataDefault(obj) {
+            // isDefault 使用布尔语义，1 表示默认，0 表示非默认。
+            updateSwitch(obj, DATA_MODULE_PATH + '/updateDefault', {
+                dictDataId: obj.value,
+                isDefault: obj.elem.checked ? '1' : '0'
+            }, window.refreshData);
+        }
+
+        function updateSwitch(obj, url, data, callback) {
+            // 调用后台更新字典类型、数据或默认项状态。
+            patchJson(url, data, {
+                defaultMsg: '状态更新失败',
+                success: function (result) {
+                    if (isAjaxSuccess(result)) {
+                        // 默认项切换成功后刷新列表，让同类型其它默认项立即回显为否。
+                        layer.msg(result.msg, {icon: 1, time: 1000}, callback);
+                    } else {
+                        obj.elem.checked = !obj.elem.checked;
+                        form.render('checkbox');
+                        layer.msg(result.msg || '状态更新失败', {icon: 2, time: 1000});
+                    }
+                },
+                error: function () {
+                    obj.elem.checked = !obj.elem.checked;
+                    form.render('checkbox');
+                }
+            });
+        }
+
+        window.refreshData = function () {
+            table.reload('dict-data-table', {
+                where: {dictTypeCode: currentDictType ? currentDictType.dictTypeCode : ''}
+            });
+        };
+    });
+</script>
+</html>

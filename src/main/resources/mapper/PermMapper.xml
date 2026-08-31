@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ylmao.admin.mapper.PermMapper">
+
+    <select id="queryPermCheckArrByRoleId" parameterType="string" resultType="com.ylmao.admin.entity.Perm">
+        SELECT a.*, IF(count(b.perm_role_id) > 0, '1', '0') checkArr
+        FROM sys_perm a
+        LEFT JOIN (SELECT * FROM sys_perm_role WHERE role_id = #{roleId}) b ON a.perm_id = b.perm_id
+        GROUP BY a.perm_id
+    </select>
+
+    <select id="selectPermChildCount" resultType="com.ylmao.admin.entity.Perm">
+        SELECT a.*, (SELECT count(1) FROM sys_perm WHERE parent_id = a.perm_id) childCount
+        FROM sys_perm a
+        ${ew.customSqlSegment}
+    </select>
+
+    <!-- 单角色权限码查询，过滤未启用与空 perm_code -->
+    <select id="queryPermsListByRoleId" parameterType="String" resultType="String">
+        SELECT p.perm_code FROM sys_perm p
+        INNER JOIN sys_perm_role pr ON p.perm_id = pr.perm_id
+        WHERE pr.role_id = #{roleId}
+          AND p.is_enabled = 1
+          AND p.perm_code IS NOT NULL
+          AND p.perm_code != ''
+    </select>
+
+    <!-- 多角色一次 JOIN，去重后供菜单树与 StpInterface 鉴权复用 -->
+    <select id="selectPermsByRoleIds" resultType="com.ylmao.admin.entity.Perm">
+        SELECT p.* FROM sys_perm p
+        INNER JOIN sys_perm_role pr ON p.perm_id = pr.perm_id
+        WHERE pr.role_id IN
+        <foreach collection="roleIds" item="roleId" open="(" separator="," close=")">
+            #{roleId}
+        </foreach>
+        AND p.is_enabled = 1
+        GROUP BY p.perm_id
+        ORDER BY p.order_num ASC
+    </select>
+
+</mapper>

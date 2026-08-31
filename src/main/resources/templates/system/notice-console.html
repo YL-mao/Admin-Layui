@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{include :: header('公告控制台')}"></head>
+<style>
+    /* 仅保留抽屉滚动区高度，其余用 layui / pear 类。 */
+    html, body { height: 100%; margin: 0; overflow: hidden; }
+</style>
+<body>
+<!-- 块与块的竖直间隙统一走 layui-col-space，避免 row 负边距贴死下一张卡片。 -->
+<div class="mainBox" style="background-color: whitesmoke; padding: 10px; box-sizing: border-box;">
+    <div class="layui-row layui-col-space10">
+        <div class="layui-col-xs12">
+            <div class="layui-card">
+                <div class="layui-card-header" id="notice-console-title">加载中…</div>
+                <div class="layui-card-body">
+                    <div id="notice-console-meta" class="layui-text"></div>
+                    <div id="notice-console-targets" class="layui-hide">
+                        <span id="notice-console-targets-label" class="layui-font-gray"></span>
+                        <span id="notice-console-targets-badges"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="layui-col-xs3">
+            <div class="layui-card">
+                <div class="layui-card-body" style="text-align: center;">
+                    <div class="layui-font-gray">投递人数</div>
+                    <div id="stat-total" class="layui-font-green layui-font-20">-</div>
+                </div>
+            </div>
+        </div>
+        <div class="layui-col-xs3">
+            <div class="layui-card">
+                <div class="layui-card-body" style="text-align: center;">
+                    <div class="layui-font-gray">已读</div>
+                    <div id="stat-read" class="layui-font-green layui-font-20">-</div>
+                </div>
+            </div>
+        </div>
+        <div class="layui-col-xs3">
+            <div class="layui-card">
+                <div class="layui-card-body" style="text-align: center;">
+                    <div class="layui-font-gray">未读</div>
+                    <div id="stat-unread" class="layui-font-green layui-font-20">-</div>
+                </div>
+            </div>
+        </div>
+        <div class="layui-col-xs3">
+            <div class="layui-card">
+                <div class="layui-card-body" style="text-align: center;">
+                    <div class="layui-font-gray">阅读率</div>
+                    <div id="stat-rate" class="layui-font-green layui-font-20">-</div>
+                </div>
+            </div>
+        </div>
+        <div class="layui-col-xs12">
+            <div class="layui-card">
+                <div class="layui-card-body">
+                    <div class="layui-tab layui-tab-brief" lay-filter="notice-console-tab">
+                        <ul class="layui-tab-title">
+                            <li class="layui-this" data-read-state="">全部</li>
+                            <li data-read-state="1">已读</li>
+                            <li data-read-state="0">未读</li>
+                        </ul>
+                        <div class="layui-tab-content">
+                            <div class="layui-tab-item layui-show">
+                                <table id="notice-console-receiver-table" lay-filter="notice-console-receiver-table"></table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="bottom">
+    <div class="button-container">
+        <button type="button" class="pear-btn pear-btn-sm" id="notice-console-close">
+            <i class="layui-icon layui-icon-close"></i>
+            关闭
+        </button>
+    </div>
+</div>
+
+<script type="text/html" id="notice-console-read-tpl" th:inline="none">
+{{# if(d.readState == 1){ }}
+    <span class="layui-badge layui-bg-green">已读</span>
+{{# } else { }}
+    <span class="layui-badge">未读</span>
+{{# } }}
+</script>
+
+<script th:inline="javascript">
+    window.noticeConsoleNoticeId = /*[[${noticeId}]]*/ '';
+</script>
+<th:block th:insert="~{include :: footer}"/>
+<script th:inline="none">
+    layui.use(['common', 'table', 'element', 'jquery', 'layer'], function () {
+        let table = layui.table;
+        let element = layui.element;
+        let $ = layui.jquery;
+        let layer = layui.layer;
+        let MODULE_PATH = apiPath + '/notice';
+        let noticeId = window.noticeConsoleNoticeId || '';
+        let currentReadState = '';
+
+        function closeConsoleLayer() {
+            let index = parent.layer.getFrameIndex(window.name);
+            parent.layer.close(index);
+        }
+
+        $('#notice-console-close').on('click', closeConsoleLayer);
+
+        if (!noticeId) {
+            layer.msg('缺少公告ID', {icon: 2, time: 1500});
+            return;
+        }
+
+        function formatMeta(stats) {
+            let parts = [];
+            if (stats.noticeTypeName) {
+                parts.push('公告类型: ' + stats.noticeTypeName);
+            }
+            if (stats.receiverTypeName) {
+                parts.push('接收范围: ' + stats.receiverTypeName);
+            }
+            if (stats.sendTime) {
+                parts.push('发布时间: ' + stats.sendTime);
+            }
+            parts.push('过期时间: ' + (stats.expireTime || '未设置'));
+            return parts.join(' · ');
+        }
+
+        function renderReceiverTargets(stats) {
+            let targets = stats.receiverTargets || [];
+            let $box = $('#notice-console-targets');
+            let $badges = $('#notice-console-targets-badges');
+            $badges.empty();
+            if (!targets.length) {
+                $box.addClass('layui-hide');
+                return;
+            }
+            let label = stats.receiverType === 2 ? '目标角色: ' : (stats.receiverType === 3 ? '目标部门: ' : '接收目标: ');
+            $('#notice-console-targets-label').text(label);
+            targets.forEach(function (name) {
+                $badges.append($('<span class="layui-badge layui-bg-green"></span>').text(name).css('margin-right', '6px'));
+            });
+            $box.removeClass('layui-hide');
+        }
+
+        function renderStats(stats) {
+            $('#notice-console-title').text(stats.noticeTitle || '-');
+            $('#stat-total').text(stats.totalCount != null ? stats.totalCount : 0);
+            $('#stat-read').text(stats.readCount != null ? stats.readCount : 0);
+            $('#stat-unread').text(stats.unreadCount != null ? stats.unreadCount : 0);
+            $('#stat-rate').text(stats.readRate || '0%');
+            $('#notice-console-meta').text(formatMeta(stats));
+            renderReceiverTargets(stats);
+        }
+
+        // 加载本条公告控制台统计摘要。
+        getJson(MODULE_PATH + '/consoleStats', {noticeId: noticeId}, {
+            defaultMsg: '加载控制台统计失败',
+            success: function (result) {
+                if (!isAjaxSuccess(result)) {
+                    layer.msg(result.msg || '加载控制台统计失败', {icon: 2, time: 1500});
+                    return;
+                }
+                renderStats(result.data || {});
+            }
+        });
+
+        function buildReceiverWhere() {
+            // 全部 Tab 传空字符串，由后端绑定为 null，避免 Layui where 合并残留旧筛选。
+            return {
+                noticeId: noticeId,
+                readState: currentReadState
+            };
+        }
+
+        // 分页加载本条公告接收人明细。
+        table.render({
+            response: TABLE_RESPONSE,
+            elem: '#notice-console-receiver-table',
+            url: MODULE_PATH + '/receiverList',
+            where: buildReceiverWhere(),
+            page: true,
+            height: 'full-380',
+            cols: [
+                [
+                    {title: '用户账号', field: 'userAccount', align: 'center', minWidth: 110},
+                    {title: '用户姓名', field: 'userName', align: 'center', minWidth: 100},
+                    {title: '部门', field: 'deptName', align: 'center', minWidth: 110},
+                    {title: '阅读状态', field: 'readState', align: 'center', width: 90, templet: '#notice-console-read-tpl'},
+                    {title: '阅读时间', field: 'readTime', align: 'center', minWidth: 160, templet: function (d) {
+                        return d.readTime || '—';
+                    }}
+                ]
+            ],
+            skin: 'line'
+        });
+
+        element.on('tab(notice-console-tab)', function (data) {
+            let $li = $(data.elem).find('.layui-tab-title li').eq(data.index);
+            currentReadState = $li.attr('data-read-state') || '';
+            // 按 Tab 切换全部 / 已读 / 未读接收人列表。
+            table.reload('notice-console-receiver-table', {
+                where: buildReceiverWhere(),
+                page: {curr: 1}
+            });
+        });
+    });
+</script>
+</body>
+</html>

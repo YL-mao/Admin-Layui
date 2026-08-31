@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ylmao.admin.mapper.JobLogMapper">
+
+    <!-- 按 end_time 取每个任务最近一次成功/失败记录；并列时用 job_log_id 兜底。 -->
+    <select id="selectLatestEffectiveByJobIds" resultType="com.ylmao.admin.entity.JobLog">
+        SELECT l.job_log_id,
+               l.job_id,
+               l.job_code,
+               l.trigger_type,
+               l.run_status,
+               l.start_time,
+               l.end_time,
+               l.cost_ms,
+               l.message,
+               l.create_time
+        FROM sys_job_log l
+        INNER JOIN (
+            SELECT job_id, MAX(end_time) AS max_end_time
+            FROM sys_job_log
+            WHERE run_status IN ('SUCCESS', 'FAILED')
+            <if test="jobIds != null and jobIds.size() &gt; 0">
+                AND job_id IN
+                <foreach collection="jobIds" item="id" open="(" separator="," close=")">
+                    #{id}
+                </foreach>
+            </if>
+            GROUP BY job_id
+        ) latest ON latest.job_id = l.job_id AND latest.max_end_time = l.end_time
+        WHERE l.run_status IN ('SUCCESS', 'FAILED')
+        <if test="jobIds != null and jobIds.size() &gt; 0">
+            AND l.job_id IN
+            <foreach collection="jobIds" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        </if>
+    </select>
+
+</mapper>

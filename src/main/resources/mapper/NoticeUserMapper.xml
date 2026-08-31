@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ylmao.admin.mapper.NoticeUserMapper">
+
+<insert id="insertBatch" parameterType="java.util.List">
+    INSERT INTO sys_notice_user
+    (user_notice_id,notice_id,user_id,is_read)
+    VALUES
+    <foreach collection="noticeUserList" item="noticeUser" separator=",">
+        (#{noticeUser.noticeUserId},#{noticeUser.noticeId},#{noticeUser.userId},#{noticeUser.readState})
+    </foreach>
+</insert>
+
+    <sql id="userInboxJoinWhere">
+        FROM sys_notice_user nu
+        INNER JOIN sys_notice n ON n.notice_id = nu.notice_id
+        WHERE nu.user_id = #{userId}
+          AND nu.is_del = 0
+          AND n.is_del = 0
+          AND n.is_send = 1
+          AND (n.expire_time IS NULL OR n.expire_time &gt; NOW())
+        <if test="noticeTitle != null and noticeTitle != ''">
+            AND n.notice_title LIKE CONCAT('%', #{noticeTitle}, '%')
+        </if>
+        <if test="noticeType != null">
+            AND n.notice_type = #{noticeType}
+        </if>
+        <if test="readState != null">
+            AND nu.is_read = #{readState}
+        </if>
+    </sql>
+
+    <select id="selectUserInboxPage" resultType="com.ylmao.admin.vo.NoticeVo$UserInboxQueryVo">
+        SELECT
+            n.notice_id,
+            n.notice_title,
+            n.notice_content,
+            n.notice_type,
+            n.send_time,
+            nu.is_read AS read_state,
+            nu.read_time
+        <include refid="userInboxJoinWhere"/>
+        ORDER BY n.order_num ASC, n.send_time DESC, n.create_time DESC
+    </select>
+
+    <update id="readAllVisibleUnread">
+        UPDATE sys_notice_user nu
+        INNER JOIN sys_notice n ON n.notice_id = nu.notice_id
+        SET nu.is_read = 1,
+            nu.read_time = NOW()
+        WHERE nu.user_id = #{userId}
+          AND nu.is_del = 0
+          AND nu.is_read = 0
+          AND n.is_del = 0
+          AND n.is_send = 1
+          AND (n.expire_time IS NULL OR n.expire_time &gt; NOW())
+    </update>
+
+    <update id="markReadByNoticeId">
+        UPDATE sys_notice_user nu
+        INNER JOIN sys_notice n ON n.notice_id = nu.notice_id
+        SET nu.is_read = 1,
+            nu.read_time = NOW()
+        WHERE nu.user_id = #{userId}
+          AND nu.notice_id = #{noticeId}
+          AND nu.is_del = 0
+          AND nu.is_read = 0
+          AND n.is_del = 0
+          AND n.is_send = 1
+          AND (n.expire_time IS NULL OR n.expire_time &gt; NOW())
+    </update>
+
+    <select id="countVisibleInboxNotice" resultType="java.lang.Integer">
+        SELECT COUNT(1)
+        <include refid="userInboxJoinWhere"/>
+          AND n.notice_id = #{noticeId}
+    </select>
+
+    <select id="selectConsoleCounts" resultType="com.ylmao.admin.vo.NoticeVo$ConsoleCountQueryVo">
+        SELECT
+            COUNT(1) AS total_count,
+            COALESCE(SUM(CASE WHEN nu.is_read = 1 THEN 1 ELSE 0 END), 0) AS read_count,
+            COALESCE(SUM(CASE WHEN nu.is_read = 0 THEN 1 ELSE 0 END), 0) AS unread_count
+        FROM sys_notice_user nu
+        WHERE nu.notice_id = #{noticeId}
+          AND nu.is_del = 0
+    </select>
+
+    <select id="selectConsoleReceiverPage" resultType="com.ylmao.admin.vo.NoticeVo$ConsoleReceiverQueryVo">
+        SELECT
+            nu.user_id,
+            u.user_account,
+            u.user_name,
+            u.dept_id,
+            nu.is_read AS read_state,
+            nu.read_time
+        FROM sys_notice_user nu
+        LEFT JOIN sys_user u ON u.user_id = nu.user_id AND u.is_del = 0
+        WHERE nu.notice_id = #{noticeId}
+          AND nu.is_del = 0
+        <if test="readState != null">
+            AND nu.is_read = #{readState}
+        </if>
+        ORDER BY nu.is_read ASC, nu.read_time DESC, nu.create_time DESC
+    </select>
+
+    <update id="softDeleteReadBefore">
+        UPDATE sys_notice_user
+        SET is_del = 1
+        WHERE is_del = 0
+          AND is_read = 1
+          AND (
+            (read_time IS NOT NULL AND read_time &lt; #{deadline})
+            OR (read_time IS NULL AND create_time &lt; #{deadline})
+          )
+    </update>
+
+    <update id="softDeleteUnreadBefore">
+        UPDATE sys_notice_user
+        SET is_del = 1
+        WHERE is_del = 0
+          AND is_read = 0
+          AND create_time &lt; #{deadline}
+    </update>
+
+</mapper>
